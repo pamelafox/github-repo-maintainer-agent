@@ -43,7 +43,7 @@ class GitHubClient:
         return repo_id, copilot_node["id"]
 
     async def create_issue_graphql(self, repo, issue):
-        """Create an issue and assign Copilot using the GraphQL API."""
+        """Create an issue and assign Copilot using the GraphQL API, with improved error handling."""
         repo_id, copilot_id = await self.get_repo_and_copilot_ids(repo)
         headers = {"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json"}
         mutation = '''
@@ -69,9 +69,17 @@ class GitHubClient:
             resp = await client.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": mutation, "variables": {"input": input_obj}})
             resp.raise_for_status()
             data = resp.json()
+        # Improved error handling
+        if "errors" in data:
+            logger.error(f"GraphQL error creating issue: {data['errors']}")
+            raise RuntimeError(f"GraphQL error creating issue: {data['errors']}")
+        issue_data = data.get("data", {}).get("createIssue", {}).get("issue")
+        if not issue_data:
+            logger.error(f"GraphQL createIssue returned no issue object: {data}")
+            raise RuntimeError(f"GraphQL createIssue returned no issue object: {data}")
         return {
-            "number": data["data"]["createIssue"]["issue"]["number"],
-            "html_url": data["data"]["createIssue"]["issue"]["url"]
+            "number": issue_data["number"],
+            "html_url": issue_data["url"]
         }
     def __init__(self, token: str):
         self.token = token
