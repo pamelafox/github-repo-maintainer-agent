@@ -1,0 +1,8 @@
+azure-identity
+openai
+python-dotenv
+rich
+dotenv-azd
+aiohttp
+playwright
+pydantic-ai
