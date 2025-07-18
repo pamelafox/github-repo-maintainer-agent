@@ -9,15 +9,14 @@ This repository provides an AI-powered agent for triaging failed Dependabot pull
 - Avoid duplicate issues for the same PR
 - Log all actions for transparency
 
-- [Features](#features)
-- [Getting started](#getting-started)
-  - [GitHub Codespaces](#github-codespaces)
-  - [VS Code Dev Containers](#vs-code-dev-containers)
-  - [Local environment](#local-environment)
-- [Configuring GitHub access](#configuring-github-access)
-- [Configuring Azure OpenAI](#configuring-azure-openai)
-- [Running the agent](#running-the-agent)
-- [Resources](#resources)
+Table of contents:
+
+* [Features](#features)
+* [Getting started](#getting-started)
+* [Configuring GitHub access](#configuring-github-access)
+* [Configuring Azure OpenAI](#configuring-azure-openai)
+* [Running the agent](#running-the-agent)
+* [Resources](#resources)
 
 ## Features
 

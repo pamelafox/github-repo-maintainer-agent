@@ -1,5 +1,3 @@
-# Clear the contents of the .env file
-Set-Content -Path .env -Value ""
 
 # Append new values to the .env file
 $azureTenantId = azd env get-value AZURE_TENANT_ID
