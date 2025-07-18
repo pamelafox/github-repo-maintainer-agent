@@ -4,5 +4,6 @@ python-dotenv
 rich
 dotenv-azd
 aiohttp
-playwright
 pydantic-ai
+httpx
+PyGithub
