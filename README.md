@@ -1,15 +1,7 @@
 
 # GitHub Repository Maintenance Agent
 
-This repository provides an AI-powered agent for triaging failed Dependabot pull requests across your GitHub repositories. The agent uses [Pydantic AI](https://ai.pydantic.dev/) for LLM-based decisions and the GitHub API for repository, PR, and issue management. It can:
-
-- Find all repositories where you are an owner, maintainer, or collaborator (optionally filtered by organization)
-- For each open Dependabot PR with a failed check, create a new actionable issue
-- Assign the issue to GitHub Copilot (if available)
-- Avoid duplicate issues for the same PR
-- Log all actions for transparency
-
-Table of contents:
+This repository provides an AI-powered agent for triaging failed Dependabot pull requests across your GitHub repositories. The agent uses [Pydantic AI](https://ai.pydantic.dev/) for LLM-based decisions and the GitHub API for repository, PR, and issue management.
 
 * [Features](#features)
 * [Getting started](#getting-started)
@@ -19,6 +11,16 @@ Table of contents:
 * [Resources](#resources)
 
 ## Features
+
+The agent can...
+
+- Find all repositories where you are an owner, maintainer, or collaborator (optionally filtered by organization)
+- For each open Dependabot PR with a failed check, create a new actionable issue
+- Assign the issue to GitHub Copilot (if available)
+- Avoid duplicate issues for the same PR
+- Log all actions for transparency
+
+It includes...
 
 - **Organization filtering:** Use the `--org` flag to process only repos in a specific organization (e.g., Azure-Samples)
 - **Pattern filtering:** Use the `--filter-pattern` flag to process only repos matching a name pattern
