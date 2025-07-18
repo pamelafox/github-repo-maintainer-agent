@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Clear the contents of the .env file
-> .env
-
 # Append new values to the .env file
 echo "API_HOST=azure" >> .env
 echo "AZURE_TENANT_ID=$(azd env get-value AZURE_TENANT_ID)" >> .env
