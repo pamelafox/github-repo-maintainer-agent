@@ -28,7 +28,7 @@ class LLMClient:
         self.agent = Agent(
             model,
             system_prompt="""
-You are an expert at analyzing GitHub Actions workflow failures for Dependabot PRs. Given a list of check runs and a PR URL, categorize the failure type, summarize the root cause, and extract any relevant error log lines. Use the following types: dependency_conflict, build_error, test_failure, install_error, other.
+You are an expert at analyzing GitHub Actions workflow failures for Dependabot PRs. Given a list of check runs and a PR URL, categorize the failure type, summarize the root cause with a few paragraphs and any relevant details (especially about package conflicts), and extract any relevant error log lines. Be specific about the packages that are conflicting - name the packages and versions.
 """,
             output_type=NativeOutput(AnalyzeFailureOutput),
         )

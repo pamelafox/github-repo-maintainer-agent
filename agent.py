@@ -21,8 +21,12 @@ logging.basicConfig(
 logger = logging.getLogger("repo_maintainer_agent")
 logger.setLevel(logging.INFO)
 
+# Set third-party loggers to WARNING level to reduce noise
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 class RepoMaintainerAgent:
-    def __init__(self, dry_run: bool = False, exclude_archived: bool = True, filter_pattern: str = None):
+    def __init__(self, dry_run: bool = False, exclude_archived: bool = True, filter_pattern: str | None = None):
         self.dry_run = dry_run
         self.exclude_archived = exclude_archived
         self.filter_pattern = filter_pattern
@@ -51,7 +55,8 @@ class RepoMaintainerAgent:
                     continue
                 total_prs += 1
                 # Only analyze if at least one failing check_run has non-empty logs
-                has_logs = any(getattr(c, 'output', None) and getattr(c.output, 'text', None) for c in failing)
+                # Check for logs safely using the helper method
+                has_logs = any(c.get_output_text() is not None for c in failing)
                 existing = await self.github.find_existing_issues(repo, pr.number)
                 if existing:
                     logger.info(f"Issue already exists for PR #{pr.number} in {repo.name}")
@@ -63,13 +68,15 @@ class RepoMaintainerAgent:
                 m = re.match(r"(?:Bump|Update) ([^ ]+)", pr_title)
                 target_pkg = m.group(1) if m else pr_title
                 if has_logs:
+                    logger.info(f"Analyzing failure for PR #{pr.number} in {repo.name} targeting {target_pkg}")
                     analysis = await self.llm.analyze_failure(AnalyzeFailureInput(pr_url=pr.url, check_runs=failing))
                     issue = IssuePayload(
                         title=f"Dependabot PR #{pr.number} to upgrade {target_pkg} failed CI",
-                        body=f"PR: {pr.url}\n\nSummary: {analysis.summary}\n\nInstructions: Please check the failed workflow and ensure the packages can be installed fully per repo README instructions.\n\nRelevant logs:\n" + "\n".join(analysis.related_logs),
+                        body=f"PR: {pr.url}\n\nSummary: {analysis.summary}\n\nInstructions: Please check the failed workflow and ensure the packages can be installed fully per repo README instructions. Always check your work by making sure the packages can be installed successfully! \n\nRelevant logs:\n" + "\n".join(analysis.related_logs),
                         labels=["dependabot-agent", analysis.type],
                         assignees=["copilot-swe-agent"],  # for dry-run/info only
                     )
+                    logger.info(f"Analysis for PR #{pr.number} in {repo.name}: {analysis.summary}")
                 else:
                     logger.info(f"No logs for PR #{pr.number} in {repo.name}, creating generic failed CI issue.")
                     issue = IssuePayload(
