@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import logging
 import os
+import re
 
 from dotenv import load_dotenv
 from rich.logging import RichHandler
@@ -48,7 +49,6 @@ class RepoMaintainerAgent:
         if self.exclude_archived:
             repos = [r for r in repos if not r.archived]
         if self.filter_pattern:
-            import re
             repos = [r for r in repos if re.search(self.filter_pattern, r.name)]
         logger.info(f"Processing {len(repos)} repositories after filtering.")
         total_prs = 0
@@ -71,7 +71,7 @@ class RepoMaintainerAgent:
                     logger.info(f"Issue already exists for PR #{pr.number} in {repo.name}")
                     continue
                 # Extract target package from PR title (e.g., 'Bump requests from 2.25.1 to 2.26.0')
-                import re
+                
                 pr_title = pr.title
                 # Try to extract the first word after 'Bump ' or 'Update '
                 m = re.match(r"(?:Bump|Update) ([^ ]+)", pr_title)
@@ -79,18 +79,26 @@ class RepoMaintainerAgent:
                 if has_logs:
                     logger.info(f"Analyzing failure for PR #{pr.number} in {repo.name} targeting {target_pkg}")
                     analysis = await self.llm.analyze_failure(AnalyzeFailureInput(pr_url=pr.url, check_runs=failing))
-                    issue = IssuePayload(
+                    issue = IssuePayload.from_template(
                         title=f"Dependabot PR #{pr.number} to upgrade {target_pkg} failed CI",
-                        body=f"PR: {pr.url}\n\nSummary: {analysis.summary}\n\nInstructions: Please check the failed workflow and ensure the packages can be installed fully per repo README instructions. Always check your work by making sure the packages can be installed successfully! \n\nRelevant logs:\n" + "\n".join(analysis.related_logs),
+                        template_path="issue_with_logs.jinja2",
+                        template_vars={
+                            "pr_url": pr.url,
+                            "summary": analysis.summary,
+                            "related_logs": analysis.related_logs
+                        },
                         labels=["dependabot-agent", analysis.type],
                         assignees=["copilot-swe-agent"],  # for dry-run/info only
                     )
                     logger.info(f"Analysis for PR #{pr.number} in {repo.name}: {analysis.summary}")
                 else:
                     logger.info(f"No logs for PR #{pr.number} in {repo.name}, creating generic failed CI issue.")
-                    issue = IssuePayload(
+                    issue = IssuePayload.from_template(
                         title=f"Dependabot #{pr.number} to upgrade {target_pkg} failed CI",
-                        body=f"PR: {pr.url}\n\nSummary: This Dependabot PR has at least one failed, cancelled, or timed out check run, but no logs are available (they may have expired). Please upgrade the package that was the target of the PR and make sure that the full package requirements can be installed according to the repo's README.",
+                        template_path="issue_no_logs.jinja2",
+                        template_vars={
+                            "pr_url": pr.url
+                        },
                         labels=["dependabot-agent", "failed_ci"],
                         assignees=["copilot-swe-agent"],  # for dry-run/info only
                     )
@@ -121,7 +129,7 @@ if __name__ == "__main__":
     parser.add_argument("--exclude-archived", action="store_true", default=True, help="Exclude archived repos")
     parser.add_argument("--filter-pattern", type=str, help="Regex to filter repo names")
     parser.add_argument("--org", type=str, help="Only include repos in this organization (e.g. Azure-Samples)")
-    parser.add_argument("--repos-yaml", type=str, help="Path to a YAML file that lists repositories to process")
+    parser.add_argument("--repos-yaml", type=str, default="repos.yaml", help="Path to a YAML file that lists repositories to process")
     args = parser.parse_args()
     
     agent = RepoMaintainerAgent(

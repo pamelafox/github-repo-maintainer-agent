@@ -1,0 +1,19 @@
+personal:
+  - flask-db-quiz-example
+  - django-quiz-app
+  - flask-charts-api-container-app
+  - flask-gallery-container-app
+  - flask-surveys-container-app
+  - simple-flask-api-container
+  
+organizations:
+  Azure-Samples:
+    - openai-chat-vision-quickstart
+    - openai-chat-app-quickstart
+    - openai-chat-app-entra-auth-builtin
+    - openai-chat-app-entra-auth-local
+    - containerapps-builtinauth-bicep
+    - appservice-builtinauth-bicep
+    - azure-openai-entity-extraction
+    - openai-chat-backend-fastapi
+    - azure-postgres-pgvector-python

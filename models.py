@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import Literal
 
+from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, HttpUrl
 
 
@@ -69,3 +71,31 @@ class IssuePayload(BaseModel):
     body: str
     labels: list[str]
     assignees: list[str]
+    
+    @classmethod
+    def from_template(cls, title: str, template_path: str, template_vars: dict, labels: list[str], assignees: list[str]) -> "IssuePayload":
+        """Create an issue payload using a Jinja template for the body.
+        
+        Args:
+            title: The issue title
+            template_path: Path to the Jinja template file
+            template_vars: Dictionary of variables to pass to the template
+            labels: List of labels to apply to the issue
+            assignees: List of users to assign to the issue
+            
+        Returns:
+            An IssuePayload instance with the rendered template as the body
+        """
+
+        
+        templates_dir = Path(__file__).parent / "templates"
+        env = Environment(loader=FileSystemLoader(templates_dir))
+        template = env.get_template(template_path)
+        body = template.render(**template_vars)
+        
+        return cls(
+            title=title,
+            body=body,
+            labels=labels,
+            assignees=assignees
+        )

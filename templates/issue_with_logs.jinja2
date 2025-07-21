@@ -1,0 +1,16 @@
+This PR is currently failing CI:
+{{ pr_url }}
+
+Create a new PR that accomplishes the same goal as that PR, but passes CI.
+
+Here's a summary of why that PR is failing:
+{{ summary }}
+
+## Related workflow logs
+
+{% if related_logs %}
+Relevant logs:
+{{ related_logs|join('\n') }}
+{% endif %}
+
+{% include 'package_verification_tips.jinja2' %}

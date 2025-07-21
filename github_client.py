@@ -362,7 +362,7 @@ class GitHubClient:
                     
                     # For failed check runs, try to get the full logs from workflow jobs
                     # but only if we haven't already found logs for another failed check
-                    if check_run.conclusion in ["failure", "cancelled", "timed_out"] and not found_logs_for_failed_check:
+                    if check_run.conclusion in ["failure", "timed_out"] and not found_logs_for_failed_check:
                         workflow_run_id = None
                         if check_suite_id := run.get("check_suite", {}).get("id"):
                             workflow_runs = await self.get_workflow_runs_by_check_suite(repo, check_suite_id)
