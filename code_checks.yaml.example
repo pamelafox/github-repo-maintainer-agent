@@ -1,0 +1,74 @@
+# Code Check Configuration
+# This file defines patterns to search for in repository files and issues to create when found
+
+code_checks:
+  # Example: Check for deprecated API usage in a specific file
+  - file_path: "requirements.txt"
+    pattern: "flask==1\\..*"
+    issue_title: "Outdated Flask version detected"
+    issue_description: |
+      This repository is using an outdated version of Flask (v1.x). 
+      Flask 2.x has been available since 2021 and includes important security updates and new features.
+      
+      Please consider upgrading to Flask 2.x or later.
+    labels:
+      - "dependencies"
+      - "security"
+    assignees:
+      - "copilot-swe-agent"
+
+  # Example: Check for insecure configurations in a specific file
+  - file_path: "app.py"
+    pattern: "app\\.run\\(.*debug=True.*\\)"
+    issue_title: "Debug mode enabled in production code"
+    issue_description: |
+      Debug mode appears to be enabled in the Flask application. 
+      This should never be enabled in production as it can expose sensitive information.
+      
+      Please ensure debug mode is disabled for production deployments.
+    labels:
+      - "security"
+      - "bug"
+    assignees: []
+
+  # Example: Check all GitHub workflow files for outdated action versions
+  - directory_path: ".github/workflows"
+    file_pattern: "\\.ya?ml$"
+    pattern: "actions/checkout@v[12]"
+    issue_title: "Outdated GitHub Actions detected in workflows"
+    issue_description: |
+      One or more GitHub workflow files are using outdated versions of actions/checkout.
+      
+      Please consider upgrading to actions/checkout@v4 or later for better performance and security.
+    labels:
+      - "github-actions"
+      - "maintenance"
+    assignees: []
+
+  # Example: Check all Python files for deprecated imports
+  - directory_path: "src"
+    file_pattern: "\\.py$"
+    pattern: "from imp import"
+    issue_title: "Deprecated 'imp' module usage detected"
+    issue_description: |
+      The 'imp' module has been deprecated since Python 3.4 and removed in Python 3.12.
+      
+      Please migrate to using 'importlib' instead.
+    labels:
+      - "python"
+      - "deprecation"
+    assignees: []
+
+  # Example: Check all workflow files for missing security configurations
+  - directory_path: ".github/workflows"
+    file_pattern: "\\.ya?ml$"  
+    pattern: "permissions:"
+    issue_title: "Missing explicit permissions in GitHub workflows"
+    issue_description: |
+      GitHub workflow files should explicitly define permissions for security best practices.
+      
+      Consider adding explicit permissions blocks to limit the scope of the GITHUB_TOKEN.
+    labels:
+      - "security"
+      - "github-actions"
+    assignees: []

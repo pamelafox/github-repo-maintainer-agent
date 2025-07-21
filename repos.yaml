@@ -1,10 +1,18 @@
 personal:
+  - fastapi-azure-function-apim
   - flask-db-quiz-example
   - django-quiz-app
   - flask-charts-api-container-app
   - flask-gallery-container-app
   - flask-surveys-container-app
   - simple-flask-api-container
+  - staticmaps-function
+  - simple-flask-server-example
+  - openai-chat-app-workshops
+  - simple-fastapi-container
+  - postgresql-playground
+  - azurite-python-playground
+  - pgvector-playground
   
 organizations:
   Azure-Samples:
@@ -17,3 +25,5 @@ organizations:
     - azure-openai-entity-extraction
     - openai-chat-backend-fastapi
     - azure-postgres-pgvector-python
+    - msdocs-flask-postgresql-sample-app
+    - simple-flask-server-appservice

@@ -1,0 +1,37 @@
+{{ description }}
+
+## Details
+
+**Pattern:** `{{ pattern }}`
+
+{% if multiple_files %}
+### Found matches in {{ total_files }} file(s) with {{ total_lines }} total match(es):
+
+{% for match in matches %}
+**File:** `{{ match.file_path }}`
+{% for i in range(match.matched_lines|length) %}
+- **Line {{ match.line_numbers[i] }}:** `{{ match.matched_lines[i] }}`
+{% endfor %}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+{% else %}
+**File:** `{{ file_path }}`
+
+{% if matched_lines %}
+### Found matches:
+
+{% for i in range(matched_lines|length) %}
+**Line {{ line_numbers[i] }}:**
+```
+{{ matched_lines[i] }}
+```
+{% endfor %}
+{% endif %}
+{% endif %}
+
+**Repository:** {{ repo_url }}
+
+---
+*This issue was automatically created by the GitHub Repo Maintainer Agent.*

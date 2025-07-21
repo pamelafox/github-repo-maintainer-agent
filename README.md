@@ -16,8 +16,9 @@ The agent can...
 
 - Find all repositories where you are an owner, maintainer, or collaborator (optionally filtered by organization)
 - For each open Dependabot PR with a failed check, create a new actionable issue
-- Assign the issue to GitHub Copilot (if available)
-- Avoid duplicate issues for the same PR
+- **Check for specific code patterns** in repository files and create issues when matches are found
+- Assign issues to GitHub Copilot (if available)
+- Avoid duplicate issues for the same PR or code pattern
 - Log all actions for transparency
 
 It includes...
@@ -183,6 +184,58 @@ Examples:
   ```sh
   python agent.py --repos-yaml repos.yaml
   ```
+
+### Code Pattern Checking
+
+You can also check for specific code patterns in repository files and create issues when matches are found:
+
+```sh
+python agent.py code-check --config code_checks.yaml
+```
+
+This mode will:
+1. Load code check configurations from a YAML file
+2. For each repository, check specified files for pattern matches
+3. Create issues when patterns are found (avoiding duplicates)
+4. Support both regex patterns and literal string matching
+
+#### Code Check Configuration
+
+Create a YAML file (e.g., `code_checks.yaml`) with the following structure:
+
+```yaml
+code_checks:
+  - file_path: "requirements.txt"
+    pattern: "flask==1\\..*"
+    issue_title: "Outdated Flask version detected"
+    issue_description: |
+      This repository is using an outdated version of Flask (v1.x). 
+      Please consider upgrading to Flask 2.x or later.
+    labels:
+      - "dependencies"
+      - "security"
+    assignees:
+      - "copilot-swe-agent"
+```
+
+Each code check configuration includes:
+- `file_path`: Path to a specific file to check (relative to repository root)
+- `directory_path`: Path to a directory to check all files within (alternative to file_path)
+- `file_pattern`: Regex pattern to filter filenames when using directory_path (optional)
+- `pattern`: Regex pattern or literal string to search for
+- `issue_title`: Title for the issue to create when pattern is found
+- `issue_description`: Description for the issue
+- `labels`: List of labels to apply to the issue (optional)
+- `assignees`: List of users to assign the issue to (optional)
+
+**Note:** Either `file_path` OR `directory_path` must be specified, but not both.
+
+Examples:
+- Check a specific file: Use `file_path: "requirements.txt"`
+- Check all files in a directory: Use `directory_path: ".github/workflows"`
+- Check only YAML files in a directory: Use `directory_path: ".github/workflows"` and `file_pattern: "\\.ya?ml$"`
+
+An example configuration file is provided at `code_checks.yaml.example`.
 
 ### Using a YAML configuration file
 

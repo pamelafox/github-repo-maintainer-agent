@@ -1,0 +1,40 @@
+# Code Check Configuration
+# This file defines patterns to search for in repository files and issues to create when found
+
+code_checks:
+  # Check GitHub workflow files for outdated Ubuntu version
+  - directory_path: ".github/workflows"
+    file_pattern: "\\.ya?ml$"
+    pattern: "ubuntu-20\\.04"
+    issue_title: "Update Ubuntu runner from ubuntu-20.04 to ubuntu-latest in GitHub workflows"
+    issue_description: |
+      GitHub workflow files are using the outdated `ubuntu-20.04` runner image.
+      
+      **Issue:** Ubuntu 20.04 runners are deprecated and will be removed by GitHub.
+      
+      **Recommendation:** Please update all instances of `ubuntu-20.04` to `ubuntu-latest` in your GitHub Actions workflow files.
+      
+      **Benefits of ubuntu-latest:**
+      - Always uses the most recent stable Ubuntu LTS version
+      - Receives the latest security updates and patches
+      - Includes updated tooling and dependencies
+      - Future-proofs your workflows against deprecation
+      
+      **Files that need updating:** Check the workflow files in `.github/workflows/` directory.
+      
+      **Example change:**
+      ```yaml
+      # Before
+      runs-on: ubuntu-20.04
+      
+      # After  
+      runs-on: ubuntu-latest
+      ```
+      
+      Please review and update the affected workflow files to use `ubuntu-latest` instead of the deprecated `ubuntu-20.04`.
+    labels:
+      - "github-actions"
+      - "maintenance"
+      - "deprecated"
+    assignees:
+      - "copilot-swe-agent"

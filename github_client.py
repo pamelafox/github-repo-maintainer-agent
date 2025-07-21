@@ -1,5 +1,6 @@
 import io
 import logging
+import os
 import re
 import zipfile
 from pathlib import Path
@@ -8,7 +9,7 @@ from typing import Any
 import httpx
 import yaml
 
-from models import CheckRun, IssuePayload, PullRequest, RepositoriesConfig, Repository
+from models import CheckRun, CodeMatchResult, DirectoryItem, FileContent, IssuePayload, PullRequest, RepositoriesConfig, Repository
 
 logger = logging.getLogger("repo_maintainer_agent")
 logger.setLevel(logging.INFO)
@@ -16,6 +17,44 @@ logger.setLevel(logging.INFO)
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 
 GITHUB_API_URL = "https://api.github.com"
+
+def get_github_token_for_org(org_name: str | None = None) -> str:
+    """Get the appropriate GitHub token for the given organization.
+    
+    Args:
+        org_name: The organization name (e.g., "Azure-Samples"). If None, uses personal token.
+        
+    Returns:
+        The GitHub token to use.
+        
+    Raises:
+        ValueError: If the required token is not found in environment variables.
+    """
+    if org_name is None:
+        # Use personal token
+        token_key = "GITHUB_TOKEN_PERSONAL"
+        if token_key not in os.environ:
+            # Fallback to generic GITHUB_TOKEN
+            token_key = "GITHUB_TOKEN"
+            if token_key not in os.environ:
+                raise ValueError("GITHUB_TOKEN_PERSONAL or GITHUB_TOKEN environment variable is required for personal repositories")
+    else:
+        # Use organization-specific token
+        # Convert org name to environment variable format (e.g., Azure-Samples -> AZURE_SAMPLES)
+        org_env_name = org_name.upper().replace("-", "_")
+        token_key = f"GITHUB_TOKEN_{org_env_name}"
+        if token_key not in os.environ:
+            # Fallback to generic GITHUB_TOKEN
+            token_key = "GITHUB_TOKEN"
+            if token_key not in os.environ:
+                raise ValueError(f"{token_key} or GITHUB_TOKEN environment variable is required for organization '{org_name}'")
+    
+    token = os.environ[token_key]
+    if not token:
+        raise ValueError(f"GitHub token '{token_key}' is empty")
+    
+    logger.info(f"Using GitHub token from {token_key} for {'personal repositories' if org_name is None else f'organization: {org_name}'}")
+    return token
 
 class GitHubClient:
     async def get_repo_and_copilot_ids(self, repo):
@@ -106,8 +145,18 @@ class GitHubClient:
         except Exception as e:
             logger.error(f"Unexpected error occurred while creating issue via GraphQL: {e}")
             raise RuntimeError(f"Failed to create issue via GraphQL: {e}")
-    def __init__(self, auth_token):
+    def __init__(self, auth_token: str | None = None, org: str | None = None):
+        """Initialize GitHubClient with appropriate token for the organization.
+        
+        Args:
+            auth_token: Optional explicit token to use. If None, will auto-select based on org.
+            org: Organization name (e.g., "Azure-Samples"). If None, uses personal token.
+        """
+        if auth_token is None:
+            auth_token = get_github_token_for_org(org)
+        
         self.auth_token = auth_token
+        self.org = org
         self.headers = {
             "Authorization": f"Bearer {auth_token}",
             "Accept": "application/vnd.github+json",
@@ -166,7 +215,8 @@ class GitHubClient:
                         repositories.append(Repository(
                             name=repo_name,
                             owner=username,
-                            archived=repo_info.get("archived", False)
+                            archived=repo_info.get("archived", False),
+                            is_personal=True  # Mark as personal repo
                         ))
                     except Exception as e:
                         logger.warning(f"Error fetching personal repository {repo_name}: {e}")
@@ -181,7 +231,8 @@ class GitHubClient:
                             repositories.append(Repository(
                                 name=repo_name,
                                 owner=org_name,
-                                archived=repo_info.get("archived", False)
+                                archived=repo_info.get("archived", False),
+                                is_personal=False  # Mark as organization repo
                             ))
                         except Exception as e:
                             logger.warning(f"Error fetching repository {org_name}/{repo_name}: {e}")
@@ -256,6 +307,7 @@ class GitHubClient:
                                 name=repo["name"],
                                 owner=repo["owner"]["login"],
                                 archived=repo["archived"],
+                                is_personal=(org is None)  # If no org specified, these are personal repos
                             ))
                     
                     # If we found a repo older than the cutoff date, stop fetching more pages
@@ -741,6 +793,219 @@ class GitHubClient:
                 
         return valid_runs
         
+    async def get_file_content(self, repo: Repository, file_path: str, ref: str = "main") -> FileContent | None:
+        """Fetch the content of a specific file from a repository.
+        
+        Args:
+            repo: The repository to fetch from
+            file_path: Path to the file in the repository
+            ref: The git reference (branch, tag, or commit SHA) to fetch from
+            
+        Returns:
+            FileContent object if the file exists, None otherwise
+        """
+        try:
+            url = f"{GITHUB_API_URL}/repos/{repo.owner}/{repo.name}/contents/{file_path}"
+            params = {"ref": ref}
+            
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.get(url, headers=self.headers, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+            
+            # Handle files that are too large or binary files
+            if data.get("type") != "file":
+                logger.warning(f"Path {file_path} is not a file in {repo.full_name}")
+                return None
+                
+            if data.get("encoding") == "base64":
+                import base64
+                content = base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
+            else:
+                content = data.get("content", "")
+            
+            return FileContent(
+                path=file_path,
+                content=content,
+                sha=data["sha"]
+            )
+            
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"File {file_path} not found in {repo.full_name}")
+                return None
+            logger.error(f"HTTP error fetching file {file_path} from {repo.full_name}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching file {file_path} from {repo.full_name}: {e}")
+            raise
+
+    async def get_directory_contents(self, repo: Repository, directory_path: str, ref: str = "main") -> list[DirectoryItem]:
+        """List the contents of a directory in a repository.
+        
+        Args:
+            repo: The repository to fetch from
+            directory_path: Path to the directory in the repository
+            ref: The git reference (branch, tag, or commit SHA) to fetch from
+            
+        Returns:
+            List of DirectoryItem objects representing files and subdirectories
+        """
+        try:
+            url = f"{GITHUB_API_URL}/repos/{repo.owner}/{repo.name}/contents/{directory_path}"
+            params = {"ref": ref}
+            
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.get(url, headers=self.headers, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+            
+            # Handle single file vs directory
+            if isinstance(data, dict):
+                logger.warning(f"Path {directory_path} is not a directory in {repo.full_name}")
+                return []
+            
+            # Parse directory contents
+            items = []
+            for item in data:
+                items.append(DirectoryItem(
+                    name=item["name"],
+                    path=item["path"],
+                    type=item["type"],
+                    sha=item["sha"],
+                    size=item.get("size"),
+                    download_url=item.get("download_url")
+                ))
+            
+            return items
+            
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"Directory {directory_path} not found in {repo.full_name}")
+                return []
+            logger.error(f"HTTP error fetching directory {directory_path} from {repo.full_name}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching directory {directory_path} from {repo.full_name}: {e}")
+            raise
+
+    async def get_files_in_directory(self, repo: Repository, directory_path: str, file_pattern: str | None = None, ref: str = "main") -> list[FileContent]:
+        """Get the content of all files in a directory, optionally filtered by pattern.
+        
+        Args:
+            repo: The repository to fetch from
+            directory_path: Path to the directory in the repository
+            file_pattern: Optional regex pattern to filter filenames
+            ref: The git reference (branch, tag, or commit SHA) to fetch from
+            
+        Returns:
+            List of FileContent objects for all matching files
+        """
+        import re
+        
+        # Get directory contents
+        items = await self.get_directory_contents(repo, directory_path, ref)
+        
+        # Filter for files only
+        files = [item for item in items if item.type == "file"]
+        
+        # Apply filename pattern filter if specified
+        if file_pattern:
+            try:
+                pattern_re = re.compile(file_pattern, re.IGNORECASE)
+                files = [f for f in files if pattern_re.search(f.name)]
+            except re.error as e:
+                logger.error(f"Invalid file pattern '{file_pattern}': {e}")
+                return []
+        
+        # Fetch content for each file
+        file_contents = []
+        for file_item in files:
+            try:
+                file_content = await self.get_file_content(repo, file_item.path, ref)
+                if file_content:
+                    file_contents.append(file_content)
+            except Exception as e:
+                logger.warning(f"Failed to fetch content for {file_item.path}: {e}")
+                continue
+        
+        return file_contents
+
+    def check_code_pattern(self, file_content: FileContent, pattern: str) -> CodeMatchResult:
+        """Check if a file contains a specific code pattern.
+        
+        Args:
+            file_content: The file content to search in
+            pattern: The pattern to search for (can be a regex or literal string)
+            
+        Returns:
+            CodeMatchResult with match information
+        """
+        import re
+        
+        lines = file_content.content.splitlines()
+        matched_lines = []
+        line_numbers = []
+        
+        # Try as regex first, fall back to literal string search
+        try:
+            pattern_re = re.compile(pattern, re.IGNORECASE)
+            for i, line in enumerate(lines, 1):
+                if pattern_re.search(line):
+                    matched_lines.append(line.strip())
+                    line_numbers.append(i)
+        except re.error:
+            # Pattern is not valid regex, use literal string search
+            for i, line in enumerate(lines, 1):
+                if pattern.lower() in line.lower():
+                    matched_lines.append(line.strip())
+                    line_numbers.append(i)
+        
+        return CodeMatchResult(
+            file_path=file_content.path,
+            pattern=pattern,
+            matched=len(matched_lines) > 0,
+            line_numbers=line_numbers,
+            matched_lines=matched_lines
+        )
+
+    async def check_file_for_issue_exists(self, repo: Repository, file_path: str, pattern: str) -> bool:
+        """Check if an issue already exists for a specific file/pattern combination.
+        
+        Args:
+            repo: The repository to check
+            file_path: The file path that was checked
+            pattern: The pattern that was searched for
+            
+        Returns:
+            True if an issue already exists, False otherwise
+        """
+        try:
+            # Search for existing issues with specific labels or title pattern
+            search_query = f"repo:{repo.full_name} is:issue is:open code-check"
+            url = f"{GITHUB_API_URL}/search/issues"
+            params = {"q": search_query}
+            
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.get(url, headers=self.headers, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+            
+            # Check if any existing issues mention the specific file and pattern
+            for issue in data.get("items", []):
+                title = issue.get("title", "").lower()
+                body = issue.get("body", "").lower()
+                if file_path.lower() in title or file_path.lower() in body:
+                    if pattern.lower() in title or pattern.lower() in body:
+                        logger.info(f"Found existing issue #{issue['number']} for {file_path} pattern in {repo.full_name}")
+                        return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking for existing issues in {repo.full_name}: {e}")
+            return False  # Assume no existing issue if we can't check
+
     def _extract_last_lines_before_completion(self, log_content: str, line_count: int = 20) -> str:
         """Extract the last N lines before 'Process completed' in a log file."""
         # Look for "Process completed" message

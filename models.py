@@ -21,6 +21,7 @@ class Repository(BaseModel):
     name: str
     owner: str
     archived: bool
+    is_personal: bool = False  # Track if this is a personal repo
     
     @property
     def full_name(self) -> str:
@@ -64,6 +65,51 @@ class AnalyzeFailureOutput(BaseModel):
     type: Literal['dependency_conflict','build_error','test_failure','install_error','other']
     summary: str
     related_logs: list[str]
+
+
+class CodeCheckConfig(BaseModel):
+    """Configuration for checking specific code patterns in files"""
+    file_path: str | None = None  # Path to a specific file in the repository
+    directory_path: str | None = None  # Path to a directory to check all files within
+    file_pattern: str | None = None  # Regex pattern to match filenames (when using directory_path)
+    pattern: str   # The line of code or pattern to search for
+    issue_title: str  # Title for the issue to create
+    issue_description: str  # Description for the issue
+    labels: list[str] = []  # Labels to apply to the issue
+    assignees: list[str] = []  # Users to assign the issue to
+
+    def model_post_init(self, __context):
+        """Validate that either file_path or directory_path is specified"""
+        if not self.file_path and not self.directory_path:
+            raise ValueError("Either file_path or directory_path must be specified")
+        if self.file_path and self.directory_path:
+            raise ValueError("Cannot specify both file_path and directory_path")
+
+
+class FileContent(BaseModel):
+    """Represents the content of a file from a repository"""
+    path: str
+    content: str
+    sha: str
+
+
+class DirectoryItem(BaseModel):
+    """Represents an item in a directory listing"""
+    name: str
+    path: str
+    type: Literal['file', 'dir', 'symlink', 'submodule']
+    sha: str
+    size: int | None = None
+    download_url: str | None = None
+
+
+class CodeMatchResult(BaseModel):
+    """Result of checking a file for a specific code pattern"""
+    file_path: str
+    pattern: str
+    matched: bool
+    line_numbers: list[int] = []  # Line numbers where matches were found
+    matched_lines: list[str] = []  # The actual lines that matched
 
 
 class IssuePayload(BaseModel):
