@@ -2,11 +2,13 @@ import io
 import logging
 import re
 import zipfile
+from pathlib import Path
 from typing import Any
 
 import httpx
+import yaml
 
-from models import CheckRun, IssuePayload, PullRequest, Repository
+from models import CheckRun, IssuePayload, PullRequest, RepositoriesConfig, Repository
 
 logger = logging.getLogger("repo_maintainer_agent")
 logger.setLevel(logging.INFO)
@@ -138,6 +140,79 @@ class GitHubClient:
             return next_url_match.group(1)  # Extract the URL for the next page
         
         return None
+
+    async def list_repos_from_yaml(self, yaml_path: str) -> list[Repository]:
+        """Load repositories from a YAML configuration file."""
+        try:
+            yaml_path_obj = Path(yaml_path)
+            if not yaml_path_obj.exists():
+                logger.warning(f"YAML file not found: {yaml_path}")
+                return []
+            
+            with open(yaml_path_obj) as f:
+                config_data = yaml.safe_load(f)
+            
+            config = RepositoriesConfig.model_validate(config_data)
+            repositories = []
+            
+            # Process personal repositories
+            if config.personal:
+                logger.info(f"Processing {len(config.personal)} personal repositories")
+                username = await self.get_authenticated_username()
+                for repo_name in config.personal:
+                    # Get repository info to check if archived
+                    try:
+                        repo_info = await self.get_repository_info(username, repo_name)
+                        repositories.append(Repository(
+                            name=repo_name,
+                            owner=username,
+                            archived=repo_info.get("archived", False)
+                        ))
+                    except Exception as e:
+                        logger.warning(f"Error fetching personal repository {repo_name}: {e}")
+            
+            # Process organization repositories
+            if config.organizations:
+                for org_name, repo_list in config.organizations.items():
+                    logger.info(f"Processing {len(repo_list)} repositories from organization {org_name}")
+                    for repo_name in repo_list:
+                        try:
+                            repo_info = await self.get_repository_info(org_name, repo_name)
+                            repositories.append(Repository(
+                                name=repo_name,
+                                owner=org_name,
+                                archived=repo_info.get("archived", False)
+                            ))
+                        except Exception as e:
+                            logger.warning(f"Error fetching repository {org_name}/{repo_name}: {e}")
+            
+            return repositories
+        except Exception as e:
+            logger.error(f"Error loading repositories from YAML: {e}")
+            return []
+    
+    async def get_authenticated_username(self) -> str:
+        """Get the username of the authenticated user."""
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.get(f"{GITHUB_API_URL}/user", headers=self.headers)
+                resp.raise_for_status()
+                data = resp.json()
+                return data["login"]
+        except Exception as e:
+            logger.error(f"Error getting authenticated username: {e}")
+            raise RuntimeError(f"Failed to get authenticated username: {e}")
+    
+    async def get_repository_info(self, owner: str, repo: str) -> dict:
+        """Get information about a repository."""
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.get(f"{GITHUB_API_URL}/repos/{owner}/{repo}", headers=self.headers)
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as e:
+            logger.error(f"Error getting repository info for {owner}/{repo}: {e}")
+            raise RuntimeError(f"Failed to get repository info for {owner}/{repo}: {e}")
 
     async def list_owned_repos(self, org: str | None = None) -> list[Repository]:
         """List all repos owned by the authenticated user, or where user is a collaborator/maintainer. Optionally filter by org using /orgs/{org}/repos."""

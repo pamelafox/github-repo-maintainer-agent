@@ -26,16 +26,25 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 class RepoMaintainerAgent:
-    def __init__(self, dry_run: bool = False, exclude_archived: bool = True, filter_pattern: str | None = None):
+    def __init__(self, dry_run: bool = False, exclude_archived: bool = True, filter_pattern: str | None = None, repos_yaml: str | None = None):
         self.dry_run = dry_run
         self.exclude_archived = exclude_archived
         self.filter_pattern = filter_pattern
+        self.repos_yaml = repos_yaml
         self.github = GitHubClient(os.environ["GITHUB_TOKEN"])
         self.llm = LLMClient()
 
     async def process_all(self, org: str | None = None):
-        repos = await self.github.list_owned_repos(org=org)
-        logger.info(f"Discovered {len(repos)} owned repositories.")
+        # Determine how to load repositories
+        if self.repos_yaml:
+            logger.info(f"Loading repositories from YAML file: {self.repos_yaml}")
+            repos = await self.github.list_repos_from_yaml(self.repos_yaml)
+        else:
+            logger.info(f"Discovering repositories from GitHub API{' (org: ' + org + ')' if org else ''}")
+            repos = await self.github.list_owned_repos(org=org)
+        
+        logger.info(f"Discovered {len(repos)} repositories.")
+        
         if self.exclude_archived:
             repos = [r for r in repos if not r.archived]
         if self.filter_pattern:
@@ -105,8 +114,6 @@ class RepoMaintainerAgent:
         logger.info(f"Scan complete. PRs checked: {total_prs}, Issues created: {total_issues}")
 
 if __name__ == "__main__":
-
-
     load_dotenv(override=True)
 
     parser = argparse.ArgumentParser(description="GitHub Repo Maintainer Agent")
@@ -114,6 +121,14 @@ if __name__ == "__main__":
     parser.add_argument("--exclude-archived", action="store_true", default=True, help="Exclude archived repos")
     parser.add_argument("--filter-pattern", type=str, help="Regex to filter repo names")
     parser.add_argument("--org", type=str, help="Only include repos in this organization (e.g. Azure-Samples)")
+    parser.add_argument("--repos-yaml", type=str, help="Path to a YAML file that lists repositories to process")
     args = parser.parse_args()
-    agent = RepoMaintainerAgent(dry_run=args.dry_run, exclude_archived=args.exclude_archived, filter_pattern=args.filter_pattern)
+    
+    agent = RepoMaintainerAgent(
+        dry_run=args.dry_run, 
+        exclude_archived=args.exclude_archived, 
+        filter_pattern=args.filter_pattern,
+        repos_yaml=args.repos_yaml
+    )
+    
     asyncio.run(agent.process_all(org=args.org))

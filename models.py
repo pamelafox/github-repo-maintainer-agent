@@ -3,6 +3,18 @@ from typing import Literal
 from pydantic import BaseModel, HttpUrl
 
 
+class RepoConfig(BaseModel):
+    """Configuration for a repository in repos.yaml"""
+    name: str
+    owner: str
+
+
+class RepositoriesConfig(BaseModel):
+    """Configuration for repositories in repos.yaml"""
+    personal: list[str] | None = None
+    organizations: dict[str, list[str]] | None = None
+
+
 class Repository(BaseModel):
     name: str
     owner: str

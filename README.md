@@ -24,6 +24,7 @@ It includes...
 
 - **Organization filtering:** Use the `--org` flag to process only repos in a specific organization (e.g., Azure-Samples)
 - **Pattern filtering:** Use the `--filter-pattern` flag to process only repos matching a name pattern
+- **YAML configuration:** Use the `--repos-yaml` flag to specify a YAML file that lists personal and organization repositories to process
 - **Dry-run mode:** Use the `--dry-run` flag to preview actions without making changes
 - **Rich logging:** See which repos and PRs are processed, and which issues are created or skipped
 
@@ -154,7 +155,7 @@ See the output of the Azure provisioning step or the comments in `infra/` for th
 Run the agent with various options:
 
 ```sh
-python agent.py [--dry-run] [--org ORG_NAME] [--filter-pattern PATTERN]
+python agent.py [--dry-run] [--org ORG_NAME] [--filter-pattern PATTERN] [--repos-yaml YAML_PATH]
 ```
 
 Examples:
@@ -176,6 +177,37 @@ Examples:
   ```sh
   python agent.py --filter-pattern your-repo-name
   ```
+
+- Process repos listed in a YAML configuration file:
+
+  ```sh
+  python agent.py --repos-yaml repos.yaml
+  ```
+
+### Using a YAML configuration file
+
+You can specify repositories to process using a YAML file with the following structure:
+
+```yaml
+# Personal repositories to process (under your GitHub username)
+personal:
+  - sample-repo
+  - another-sample-repo
+
+# Organization repositories to process
+organizations:
+  # Organization name
+  my-organization:
+    - org-repo1
+    - org-repo2
+  
+  # Another organization
+  another-org:
+    - project-repo
+    - another-project-repo
+```
+
+An example configuration file is provided at `repos.yaml.example`. Create your own `repos.yaml` file based on this example.
 
 This is how it works:
 
