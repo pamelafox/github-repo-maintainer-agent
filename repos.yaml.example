@@ -1,0 +1,19 @@
+# GitHub Repository Configuration File
+# This file specifies which repositories to process by the Repo Maintainer Agent
+
+# Personal repositories to process (under your GitHub username)
+personal:
+  - sample-repo
+  - another-sample-repo
+
+# Organization repositories to process
+organizations:
+  # Organization name
+  my-organization:
+    - org-repo1
+    - org-repo2
+  
+  # Another organization
+  another-org:
+    - project-repo
+    - another-project-repo
