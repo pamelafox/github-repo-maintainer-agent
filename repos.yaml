@@ -8,7 +8,6 @@ personal:
   - simple-flask-api-container
   - staticmaps-function
   - simple-flask-server-example
-  - openai-chat-app-workshops
   - simple-fastapi-container
   - postgresql-playground
   - azurite-python-playground
@@ -27,3 +26,7 @@ organizations:
     - azure-postgres-pgvector-python
     - msdocs-flask-postgresql-sample-app
     - simple-flask-server-appservice
+    - rag-postgres-openai-python
+    - aisearch-openai-rag-audio
+    - azure-search-openai-demo
+    - contoso-chat

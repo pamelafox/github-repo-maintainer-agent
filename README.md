@@ -1,4 +1,3 @@
-
 # GitHub Repository Maintenance Agent
 
 This repository provides an AI-powered agent for triaging failed Dependabot pull requests across your GitHub repositories. The agent uses [Pydantic AI](https://ai.pydantic.dev/) for LLM-based decisions and the GitHub API for repository, PR, and issue management.
@@ -24,7 +23,7 @@ The agent can...
 It includes...
 
 - **Organization filtering:** Use the `--org` flag to process only repos in a specific organization (e.g., Azure-Samples)
-- **Pattern filtering:** Use the `--filter-pattern` flag to process only repos matching a name pattern
+- **Repository targeting:** Use the `--repo` flag to process only a specific repository by name
 - **YAML configuration:** Use the `--repos-yaml` flag to specify a YAML file that lists personal and organization repositories to process
 - **Dry-run mode:** Use the `--dry-run` flag to preview actions without making changes
 - **Rich logging:** See which repos and PRs are processed, and which issues are created or skipped
@@ -153,47 +152,96 @@ See the output of the Azure provisioning step or the comments in `infra/` for th
 
 ## Running the agent
 
-Run the agent with various options:
+The agent supports two main commands:
+
+### Dependabot Command (Default)
+
+Check Dependabot PRs and create issues for failures. This is the default behavior when no command is specified.
+
+**Basic syntax:**
 
 ```sh
-python agent.py [--dry-run] [--org ORG_NAME] [--filter-pattern PATTERN] [--repos-yaml YAML_PATH]
+python agent.py [dependabot] [OPTIONS]
 ```
 
-Examples:
+**Common options:**
 
-- Dry run for all repos you own or maintain:
+* `--dry-run`: Log actions without making changes
+* `--exclude-archived`: Exclude archived repositories (default: True)
+* `--repo REPO_NAME`: Target specific repository by name
+* `--org ORG_NAME`: Only include repos in this organization (e.g. Azure-Samples)
+* `--repos-yaml YAML_PATH`: Path to YAML file that lists repositories to process
+
+**Examples:**
+
+* Dry run for all repos you own or maintain:
 
   ```sh
   python agent.py --dry-run
+  # or explicitly:
+  python agent.py dependabot --dry-run
   ```
 
-- Process only repos in a particular GitHub organization:
+* Process only repos in a particular GitHub organization:
 
   ```sh
-  python agent.py --org Your-Org-Name
+  python agent.py --org Azure-Samples
   ```
 
-- Process only repos matching a pattern:
+* Process a specific repository:
 
   ```sh
-  python agent.py --filter-pattern your-repo-name
+  python agent.py --repo rag-postgres-openai-python
   ```
 
-- Process repos listed in a YAML configuration file:
+* Process a specific repository in a specific organization:
+
+  ```sh
+  python agent.py --org Azure-Samples --repo rag-postgres-openai-python
+  ```
+
+* Process repos listed in a YAML configuration file:
 
   ```sh
   python agent.py --repos-yaml repos.yaml
   ```
 
-### Code Pattern Checking
+### Code Pattern Checking Command
 
-You can also check for specific code patterns in repository files and create issues when matches are found:
+Check for specific code patterns in repository files and create issues when matches are found.
+
+**Basic syntax:**
 
 ```sh
-python agent.py code-check --config code_checks.yaml
+python agent.py code-check --config CONFIG_FILE [OPTIONS]
 ```
 
+**Required options:**
+
+* `--config CONFIG_FILE`: Path to YAML file containing code check configurations
+
+**Examples:**
+
+* Check code patterns using a configuration file:
+
+  ```sh
+  python agent.py code-check --config code_checks.yaml
+  ```
+
+* Dry run with code pattern checking:
+
+  ```sh
+  python agent.py code-check --config code_checks.yaml --dry-run
+  ```
+
+* Check code patterns only in Azure-Samples organization:
+
+  ```sh
+  python agent.py code-check --config code_checks.yaml --org Azure-Samples
+  ```
+
 This mode will:
+
 1. Load code check configurations from a YAML file
 2. For each repository, check specified files for pattern matches
 3. Create issues when patterns are found (avoiding duplicates)
@@ -219,21 +267,23 @@ code_checks:
 ```
 
 Each code check configuration includes:
-- `file_path`: Path to a specific file to check (relative to repository root)
-- `directory_path`: Path to a directory to check all files within (alternative to file_path)
-- `file_pattern`: Regex pattern to filter filenames when using directory_path (optional)
-- `pattern`: Regex pattern or literal string to search for
-- `issue_title`: Title for the issue to create when pattern is found
-- `issue_description`: Description for the issue
-- `labels`: List of labels to apply to the issue (optional)
-- `assignees`: List of users to assign the issue to (optional)
+
+* `file_path`: Path to a specific file to check (relative to repository root)
+* `directory_path`: Path to a directory to check all files within (alternative to file_path)
+* `file_pattern`: Regex pattern to filter filenames when using directory_path (optional)
+* `pattern`: Regex pattern or literal string to search for
+* `issue_title`: Title for the issue to create when pattern is found
+* `issue_description`: Description for the issue
+* `labels`: List of labels to apply to the issue (optional)
+* `assignees`: List of users to assign the issue to (optional)
 
 **Note:** Either `file_path` OR `directory_path` must be specified, but not both.
 
 Examples:
-- Check a specific file: Use `file_path: "requirements.txt"`
-- Check all files in a directory: Use `directory_path: ".github/workflows"`
-- Check only YAML files in a directory: Use `directory_path: ".github/workflows"` and `file_pattern: "\\.ya?ml$"`
+
+* Check a specific file: Use `file_path: "requirements.txt"`
+* Check all files in a directory: Use `directory_path: ".github/workflows"`
+* Check only YAML files in a directory: Use `directory_path: ".github/workflows"` and `file_pattern: "\\.ya?ml$"`
 
 An example configuration file is provided at `code_checks.yaml.example`.
 
@@ -262,7 +312,9 @@ organizations:
 
 An example configuration file is provided at `repos.yaml.example`. Create your own `repos.yaml` file based on this example.
 
-This is how it works:
+## How it works
+
+### Dependabot Command
 
 1. Lists all repositories you own, maintain, or collaborate on (optionally filtered by org or pattern)
 2. For each repo, finds open Dependabot PRs
@@ -270,8 +322,15 @@ This is how it works:
 4. If a failed PR does not already have a triage issue, creates one and assigns Copilot (if available)
 5. Logs all actions and skips duplicates
 
+### Code-Check Command
+
+1. Load code check configurations from a YAML file
+2. For each repository, check specified files or directories for pattern matches
+3. Create issues when patterns are found (avoiding duplicates)
+4. Support both regex patterns and literal string matching
+
 ## Resources
 
-- [Pydantic AI Documentation](https://ai.pydantic.dev/)
-- [GitHub REST API Docs](https://docs.github.com/en/rest)
-- [GitHub GraphQL API Docs](https://docs.github.com/en/graphql)
+* [Pydantic AI Documentation](https://ai.pydantic.dev/)
+* [GitHub REST API Docs](https://docs.github.com/en/rest)
+* [GitHub GraphQL API Docs](https://docs.github.com/en/graphql)

@@ -1,0 +1,48 @@
+code_checks:
+  - directory_path: ".github/workflows"
+    file_pattern: ".*\\.ya?ml$"
+    pattern: "(auto-approve-action|copilot-swe-agent)"
+    issue_title: "Add auto-approve workflow for GitHub Copilot agent PRs"
+    issue_description: |
+      ## Issue Description
+      
+      This repository contains references to auto-approve actions or Copilot SWE agent in workflow files, but should have a dedicated workflow to auto-approve PRs from the GitHub Copilot agent.
+      
+      ## Recommended Action
+      
+      Create a new workflow file at `.github/workflows/auto_approve_copilot.yaml` with the following content:
+      
+      ```yaml
+      name: Auto-approve Copilot PRs
+      
+      on:
+        pull_request:
+          types: [opened, synchronize]
+      
+      jobs:
+        auto-approve:
+          runs-on: ubuntu-latest
+          if: github.actor == 'copilot-swe-agent'
+          steps:
+            - name: Auto-approve PR from Copilot agent
+              uses: hmarr/auto-approve-action@v3
+              with:
+                github-token: ${{ secrets.GITHUB_TOKEN }}
+      ```
+      
+      This workflow will:
+      - Automatically approve PRs created by the `copilot-swe-agent`
+      - Use the `hmarr/auto-approve-action@v3` action for reliable auto-approval
+      - Only run on PRs from the Copilot agent for security
+      
+      ## Benefits
+      
+      - Streamlines the development workflow with Copilot
+      - Reduces manual intervention for agent-created PRs
+      - Maintains security by only auto-approving specific agent PRs
+      
+    labels:
+      - "enhancement"
+      - "automation"
+      - "copilot"
+    assignees: []

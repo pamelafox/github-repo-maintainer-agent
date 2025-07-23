@@ -28,10 +28,10 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 class RepoMaintainerAgent:
-    def __init__(self, dry_run: bool = False, exclude_archived: bool = True, filter_pattern: str | None = None, repos_yaml: str | None = None):
+    def __init__(self, dry_run: bool = False, exclude_archived: bool = True, repo_name: str | None = None, repos_yaml: str | None = None):
         self.dry_run = dry_run
         self.exclude_archived = exclude_archived
-        self.filter_pattern = filter_pattern
+        self.repo_name = repo_name
         self.repos_yaml = repos_yaml
         self.llm = LLMClient()
         # Cache for GitHub clients by organization
@@ -67,8 +67,8 @@ class RepoMaintainerAgent:
         
         if self.exclude_archived:
             repos = [r for r in repos if not r.archived]
-        if self.filter_pattern:
-            repos = [r for r in repos if re.search(self.filter_pattern, r.name)]
+        if self.repo_name:
+            repos = [r for r in repos if r.name == self.repo_name]
         logger.info(f"Processing {len(repos)} repositories after filtering.")
         total_prs = 0
         total_issues = 0
@@ -191,8 +191,8 @@ class RepoMaintainerAgent:
         
         if self.exclude_archived:
             repos = [r for r in repos if not r.archived]
-        if self.filter_pattern:
-            repos = [r for r in repos if re.search(self.filter_pattern, r.name)]
+        if self.repo_name:
+            repos = [r for r in repos if r.name == self.repo_name]
         
         logger.info(f"Processing {len(repos)} repositories after filtering.")
         
@@ -334,9 +334,9 @@ if __name__ == "__main__":
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument("--dry-run", action="store_true", help="Log actions without making changes")
     parent_parser.add_argument("--exclude-archived", action="store_true", default=True, help="Exclude archived repos")
-    parent_parser.add_argument("--filter-pattern", type=str, help="Regex to filter repo names")
+    parent_parser.add_argument("--repo", type=str, help="Target specific repository by name")
     parent_parser.add_argument("--org", type=str, help="Only include repos in this organization (e.g. Azure-Samples)")
-    parent_parser.add_argument("--repos-yaml", type=str, default="repos.yaml", help="Path to a YAML file that lists repositories to process")
+    parent_parser.add_argument("--repos-yaml", type=str, help="Path to a YAML file that lists repositories to process")
 
     parser = argparse.ArgumentParser(description="GitHub Repo Maintainer Agent", parents=[parent_parser])
     
@@ -355,7 +355,7 @@ if __name__ == "__main__":
     agent = RepoMaintainerAgent(
         dry_run=args.dry_run, 
         exclude_archived=args.exclude_archived, 
-        filter_pattern=args.filter_pattern,
+        repo_name=args.repo,
         repos_yaml=args.repos_yaml
     )
     

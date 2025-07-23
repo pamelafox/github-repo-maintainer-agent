@@ -1,0 +1,36 @@
+code_checks:
+  # Check for outdated Bicep syntax in container-apps.bicep
+  - file_path: "infra/core/host/container-apps.bicep"
+    pattern: "scope: !empty\\(containerRegistryResourceGroupName\\)"
+    issue_title: "Upgrade Bicep to the new syntax"
+    issue_description: |
+      ## Issue Description
+      
+      This repository contains outdated Bicep syntax in `infra/core/host/container-apps.bicep`.
+      
+      ## Current Code
+      ```bicep
+        scope: !empty(containerRegistryResourceGroupName) ? resourceGroup(containerRegistryResourceGroupName) : resourceGroup()
+      ```
+      
+      ## Recommended Fix
+      
+      Replace the current syntax with:
+      ```bicep
+      scope: resourceGroup(!empty(containerRegistryResourceGroupName) ? containerRegistryResourceGroupName : resourceGroup().name)
+      ```
+      
+      ## Validation
+      
+      After making this change, run `az bicep build` on `infra/main.bicep` to ensure the Bicep syntax is valid.
+      You can usually find the parameters file at `infra/main.parameters.json`.
+
+      Make sure you do NOT check in any generated ARM JSON into git,
+      delete generated JSON files (like infra/main.json) before committing.
+
+    labels:
+      - "bicep"
+      - "infrastructure"
+      - "maintenance"
+    assignees:
+      - "copilot-swe-agent"
