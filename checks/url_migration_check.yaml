@@ -1,0 +1,44 @@
+code_checks:
+  # Check for old Azure inference URL that should be replaced with GitHub AI URL
+  - search_repo: true
+    pattern: "https://models.inference.ai.azure.com"
+    issue_title: "Replace Azure Inference URL with GitHub Models API URL"
+    issue_description: |
+      ## Issue Description
+
+      This repository contains references to the old Azure inference URL that should be updated to use the new GitHub Models API endpoint.
+
+      ### Current URL
+      ```
+      https://models.inference.ai.azure.com
+      ```
+      
+      ### New URL
+      ```
+      https://models.github.ai/inference
+      ```
+      
+      ## Why change is needed
+      
+      For GitHub Models API, the Azure inference endpoint is being deprecated:
+      https://github.blog/changelog/2025-07-17-deprecation-of-azure-endpoint-for-github-models/
+      
+      ## Action required
+
+      * For all files that support GitHub Models, replace all instances of `https://models.inference.ai.azure.com` with `https://models.github.ai/inference` in the affected files.
+      * If there is a model name that is being used with GitHub Models in the code, like "gpt-4o", change that model name to "openai/gpt-4o" instead - put "openai/" in front.
+
+      For example, this new code would be correct when using GitHub Models with OpenAI:
+
+      ```python
+      if API_HOST == "github":
+          client = openai.OpenAI(
+            base_url="https://models.github.ai/inference",
+            api_key=os.environ["GITHUB_TOKEN"],
+          )
+          MODEL_NAME = os.getenv("GITHUB_MODEL", "openai/gpt-4o")
+      ```
+    labels:
+      - "github-repo-maintainer-agent"
+    assignees:
+      - "copilot-swe-agent"

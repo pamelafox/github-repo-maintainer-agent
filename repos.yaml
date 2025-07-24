@@ -12,6 +12,10 @@ personal:
   - postgresql-playground
   - azurite-python-playground
   - pgvector-playground
+  - learnlive-rag-starter
+  - improv-with-python
+  - my-py-talks
+  - github-repo-maintainer-agent
   
 organizations:
   Azure-Samples:
@@ -29,4 +33,7 @@ organizations:
     - rag-postgres-openai-python
     - aisearch-openai-rag-audio
     - azure-search-openai-demo
+    - python-ai-agent-frameworks-demos
     - contoso-chat
+  microsoft:
+    - Build25-BRK234

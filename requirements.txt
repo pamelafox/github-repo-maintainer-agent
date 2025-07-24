@@ -10,3 +10,4 @@ PyGithub
 pyyaml
 jinja2
 pytest
+tenacity

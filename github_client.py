@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 import yaml
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from models import CheckRun, CodeMatchResult, DirectoryItem, FileContent, IssuePayload, PullRequest, RepositoriesConfig, Repository
 
@@ -18,11 +19,25 @@ GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 
 GITHUB_API_URL = "https://api.github.com"
 
-def get_github_token_for_org(org_name: str | None = None) -> str:
+
+class GitHubRateLimitError(Exception):
+    """Exception raised when GitHub API rate limit is exceeded."""
+    pass
+
+
+def should_retry_github_search(exception):
+    """Determine if we should retry a GitHub search API call based on the exception."""
+    # Only retry on 403 rate limit errors
+    if isinstance(exception, httpx.HTTPStatusError):
+        return exception.response.status_code == 403
+    return False
+
+
+def get_github_token_for_org(org: str | None = None) -> str:
     """Get the appropriate GitHub token for the given organization.
     
     Args:
-        org_name: The organization name (e.g., "Azure-Samples"). If None, uses personal token.
+        org: The organization name (e.g., "Azure-Samples"). If None, uses personal token.
         
     Returns:
         The GitHub token to use.
@@ -30,7 +45,7 @@ def get_github_token_for_org(org_name: str | None = None) -> str:
     Raises:
         ValueError: If the required token is not found in environment variables.
     """
-    if org_name is None:
+    if org is None:
         # Use personal token
         token_key = "GITHUB_TOKEN_PERSONAL"
         if token_key not in os.environ:
@@ -41,19 +56,19 @@ def get_github_token_for_org(org_name: str | None = None) -> str:
     else:
         # Use organization-specific token
         # Convert org name to environment variable format (e.g., Azure-Samples -> AZURE_SAMPLES)
-        org_env_name = org_name.upper().replace("-", "_")
+        org_env_name = org.upper().replace("-", "_")
         token_key = f"GITHUB_TOKEN_{org_env_name}"
         if token_key not in os.environ:
             # Fallback to generic GITHUB_TOKEN
             token_key = "GITHUB_TOKEN"
             if token_key not in os.environ:
-                raise ValueError(f"{token_key} or GITHUB_TOKEN environment variable is required for organization '{org_name}'")
+                raise ValueError(f"{token_key} or GITHUB_TOKEN environment variable is required for organization '{org}'")
     
     token = os.environ[token_key]
     if not token:
         raise ValueError(f"GitHub token '{token_key}' is empty")
     
-    logger.info(f"Using GitHub token from {token_key} for {'personal repositories' if org_name is None else f'organization: {org_name}'}")
+    logger.info(f"Using GitHub token from {token_key} for {'personal repositories' if org is None else f'organization: {org}'}")
     return token
 
 class GitHubClient:
@@ -270,11 +285,11 @@ class GitHubClient:
         repos = []
         
         if org:
-            # List all repos in the org, sorted by updated date in descending order, filter by permissions
-            url = f"{GITHUB_API_URL}/orgs/{org}/repos?per_page=100&type=public&sort=updated&direction=desc"
+            # List all repos in the org, sorted by updated date in descending order
+            url = f"{GITHUB_API_URL}/orgs/{org}/repos?per_page=100&sort=updated&direction=desc"
         else:
-            # Use affiliation=owner,collaborator,organization_member to get all repos user can access
-            url = f"{GITHUB_API_URL}/user/repos?affiliation=owner,collaborator,organization_member&per_page=100&type=public"
+            # Get user's repositories (owned, collaborator, and organization member)
+            url = f"{GITHUB_API_URL}/user/repos?affiliation=owner,collaborator,organization_member&per_page=100"
         
         # Calculate the cutoff date (one year ago)
         from datetime import datetime, timedelta, timezone
@@ -447,9 +462,6 @@ class GitHubClient:
                                     logger.info(f"Found workflow logs for failed run, total size: {len(job_logs)} bytes")
                                     if not check_run.output:
                                         check_run.output = {}
-                                    # Save to a local file for debugging
-                                    with open(f"check_run_{check_run.name}_logs.txt", "w", encoding="utf-8") as f:
-                                        f.write(job_logs)
                                     check_run.output["text"] = job_logs
                                     # Mark that we've found logs for a failed check
                                     found_logs_for_failed_check = True
@@ -1032,3 +1044,118 @@ class GitHubClient:
             return log_content
         
         return "\n".join(lines[-line_count:])
+    
+    @retry(
+        retry=retry_if_exception(should_retry_github_search),
+        stop=stop_after_attempt(3),  # Try up to 3 times total
+        wait=wait_exponential(multiplier=60, min=60, max=900),  # Start with 60s, then 120s, 240s (capped at 15min)
+        reraise=True
+    )
+    async def search_code_in_repo(self, repo: Repository, query: str) -> list[CodeMatchResult]:
+        """Search for code patterns in a repository using GitHub's search API.
+        
+        Args:
+            repo: The repository to search in
+            query: The search query/pattern to look for
+            
+        Returns:
+            List of CodeMatchResult objects containing file paths and match details
+        """
+        try:
+            # Construct the search query to limit to the specific repository
+            search_query = f"{query} repo:{repo.owner}/{repo.name}"
+            url = f"{GITHUB_API_URL}/search/code"
+            params = {
+                "q": search_query,
+                "per_page": 100  # Maximum allowed per page
+            }
+            
+            results = []
+            
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.get(url, headers=self.headers, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+            
+            # Process search results
+            for item in data.get("items", []):
+                file_path = item.get("path", "")
+                
+                # Get the actual file content to find exact matches
+                file_content = await self.get_file_content(repo, file_path)
+                if file_content and query in file_content.content:
+                    # Find line numbers where the pattern occurs
+                    lines = file_content.content.split('\n')
+                    matching_line_numbers = []
+                    matching_lines = []
+                    for line_num, line in enumerate(lines, 1):
+                        if query in line:
+                            matching_line_numbers.append(line_num)
+                            matching_lines.append(line.strip())
+                    
+                    if matching_line_numbers:
+                        results.append(CodeMatchResult(
+                            file_path=file_path,
+                            pattern=query,
+                            matched=True,
+                            line_numbers=matching_line_numbers,
+                            matched_lines=matching_lines
+                        ))
+            
+            logger.info(f"Found {len(results)} files with matches for '{query}' in {repo.full_name}")
+            return results
+            
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 422:
+                # Unprocessable Entity - often means no results or invalid query
+                logger.info(f"No search results found for '{query}' in {repo.full_name}")
+                return []
+            elif e.response.status_code == 403:
+                # Rate limit exceeded - this will trigger retry via tenacity
+                logger.warning(f"Search API rate limit exceeded for {repo.full_name}, retrying...")
+                # Extract rate limit info from response headers if available
+                rate_limit_remaining = e.response.headers.get('x-ratelimit-remaining', 'unknown')
+                rate_limit_reset = e.response.headers.get('x-ratelimit-reset', 'unknown') 
+                logger.info(f"Rate limit remaining: {rate_limit_remaining}, reset time: {rate_limit_reset}")
+                # Re-raise so tenacity can retry it
+                raise
+            else:
+                logger.error(f"HTTP error searching for '{query}' in {repo.full_name}: {e}")
+                raise
+        except Exception as e:
+            logger.error(f"Error searching for '{query}' in {repo.full_name}: {e}")
+            raise
+
+
+
+async def create_issue_graphql(self, repo, issue):
+    """Create an issue and assign Copilot using the GraphQL API, with improved error handling."""
+    repo_id, copilot_id = await self.get_repo_and_copilot_ids(repo)
+    headers = {"Authorization": f"Bearer {self.auth_token}", "Accept": "application/vnd.github+json"}
+    mutation = '''
+    mutation($input: CreateIssueInput!) {
+        createIssue(input: $input) {
+        issue {
+            id
+            number
+            title
+            url
+        }
+        }
+    }
+    '''
+    input_obj = {
+        "repositoryId": repo_id,
+        "title": issue.title,
+        "body": issue.body,
+        "assigneeIds": [copilot_id],
+    }
+    async with httpx.AsyncClient(timeout=self.timeout) as client:
+        resp = await client.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": mutation, "variables": {"input": input_obj}})
+        resp.raise_for_status()
+        data = resp.json()
+    issue_data = data.get("data", {}).get("createIssue", {}).get("issue")
+    return {
+        "number": issue_data["number"],
+        "html_url": issue_data["url"]
+    }

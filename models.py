@@ -72,6 +72,7 @@ class CodeCheckConfig(BaseModel):
     file_path: str | None = None  # Path to a specific file in the repository
     directory_path: str | None = None  # Path to a directory to check all files within
     file_pattern: str | None = None  # Regex pattern to match filenames (when using directory_path)
+    search_repo: bool = False  # If True, search entire repository using GitHub's search API
     pattern: str   # The line of code or pattern to search for
     issue_title: str  # Title for the issue to create
     issue_description: str  # Description for the issue
@@ -79,11 +80,17 @@ class CodeCheckConfig(BaseModel):
     assignees: list[str] = []  # Users to assign the issue to
 
     def model_post_init(self, __context):
-        """Validate that either file_path or directory_path is specified"""
-        if not self.file_path and not self.directory_path:
-            raise ValueError("Either file_path or directory_path must be specified")
-        if self.file_path and self.directory_path:
-            raise ValueError("Cannot specify both file_path and directory_path")
+        """Validate configuration options"""
+        options_count = sum([
+            bool(self.file_path),
+            bool(self.directory_path),
+            bool(self.search_repo)
+        ])
+        
+        if options_count == 0:
+            raise ValueError("Must specify one of: file_path, directory_path, or search_repo=True")
+        if options_count > 1:
+            raise ValueError("Cannot specify more than one of: file_path, directory_path, or search_repo=True")
 
 
 class FileContent(BaseModel):

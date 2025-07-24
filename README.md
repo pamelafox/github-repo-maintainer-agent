@@ -141,6 +141,19 @@ You should now have a `.env` file with the following variables:
 
     - `GITHUB_TOKEN` (required): A GitHub personal access token with access to your repositories. You can create one in your GitHub account settings under Developer settings > Personal access tokens. Make sure it can read Pull requests, Commits, and can read/write issues.
 
+### Organization-specific GitHub tokens
+
+For improved security when working with multiple organizations, you can configure organization-specific GitHub tokens. The agent will automatically select the appropriate token based on the organization you're targeting:
+
+    - `GITHUB_TOKEN`: Default token for personal repositories and general use
+    - `GITHUB_TOKEN_<ORG_NAME>`: Token specific to an organization (replace `<ORG_NAME>` with the actual organization name in uppercase)
+
+**Examples:**
+    - `GITHUB_TOKEN_AZURE_SAMPLES`: Token specifically for Azure-Samples organization repositories
+    - `GITHUB_TOKEN_MICROSOFT`: Token specifically for Microsoft organization repositories
+
+When you use `--org Azure-Samples`, the agent will automatically use `GITHUB_TOKEN_AZURE_SAMPLES` if it exists, falling back to the default `GITHUB_TOKEN` if not found. This allows you to use different tokens with different permission scopes for different organizations.
+
 For Azure OpenAI usage, you must also set:
 
     - `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI endpoint URL (e.g. `https://<your-resource>.openai.azure.com`)
@@ -271,19 +284,21 @@ Each code check configuration includes:
 * `file_path`: Path to a specific file to check (relative to repository root)
 * `directory_path`: Path to a directory to check all files within (alternative to file_path)
 * `file_pattern`: Regex pattern to filter filenames when using directory_path (optional)
+* `search_repo`: If true, search entire repository using GitHub's search API (alternative to file_path/directory_path)
 * `pattern`: Regex pattern or literal string to search for
 * `issue_title`: Title for the issue to create when pattern is found
 * `issue_description`: Description for the issue
 * `labels`: List of labels to apply to the issue (optional)
 * `assignees`: List of users to assign the issue to (optional)
 
-**Note:** Either `file_path` OR `directory_path` must be specified, but not both.
+**Note:** Must specify exactly one of: `file_path`, `directory_path`, or `search_repo: true`.
 
 Examples:
 
 * Check a specific file: Use `file_path: "requirements.txt"`
 * Check all files in a directory: Use `directory_path: ".github/workflows"`
 * Check only YAML files in a directory: Use `directory_path: ".github/workflows"` and `file_pattern: "\\.ya?ml$"`
+* Search entire repository: Use `search_repo: true` (uses GitHub's search API for fast repository-wide searches)
 
 An example configuration file is provided at `code_checks.yaml.example`.
 

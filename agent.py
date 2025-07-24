@@ -214,6 +214,9 @@ class RepoMaintainerAgent:
                 if check.file_path:
                     check_target = check.file_path
                     logger.info(f"Checking {repo.name} for pattern '{check.pattern}' in file {check.file_path}")
+                elif check.search_repo:
+                    check_target = "entire repository"
+                    logger.info(f"Checking {repo.name} for pattern '{check.pattern}' across entire repository using search API")
                 else:
                     check_target = f"{check.directory_path}/*"
                     if check.file_pattern:
@@ -231,6 +234,7 @@ class RepoMaintainerAgent:
                     
                     # Get file content(s) to check
                     files_to_check = []
+                    search_results = []
                     
                     if check.file_path:
                         # Single file check
@@ -240,8 +244,15 @@ class RepoMaintainerAgent:
                         else:
                             logger.info(f"File {check.file_path} not found in {repo.name}")
                             continue
+                    elif check.search_repo:
+                        # Use GitHub search API for repository-wide search
+                        logger.info(f"Using search API to find '{check.pattern}' in {repo.name}")
+                        search_results = await github.search_code_in_repo(repo, check.pattern)
+                        if not search_results:
+                            logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name} via search API")
+                            continue
                     else:
-                        # Directory check
+                        # Directory check (traditional method)
                         files_to_check = await github.get_files_in_directory(
                             repo, check.directory_path, check.file_pattern
                         )
@@ -250,12 +261,18 @@ class RepoMaintainerAgent:
                             continue
                         logger.info(f"Found {len(files_to_check)} files to check in {check.directory_path}")
                     
-                    # Check for pattern matches in all files
+                    # Check for pattern matches
                     all_matches = []
-                    for file_content in files_to_check:
-                        result = github.check_code_pattern(file_content, check.pattern)
-                        if result.matched:
-                            all_matches.append(result)
+                    
+                    if search_results:
+                        # Use search results directly
+                        all_matches = search_results
+                    else:
+                        # Check files individually for pattern matches
+                        for file_content in files_to_check:
+                            result = github.check_code_pattern(file_content, check.pattern)
+                            if result.matched:
+                                all_matches.append(result)
                     
                     if all_matches:
                         total_matches += 1
@@ -318,6 +335,8 @@ class RepoMaintainerAgent:
                     else:
                         if check.file_path:
                             logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name}/{check.file_path}")
+                        elif check.search_repo:
+                            logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name} (searched entire repo)")
                         else:
                             logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name}/{check.directory_path}")
                         
