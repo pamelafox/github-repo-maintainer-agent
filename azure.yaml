@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
 
-name: azure-openai-entity-extraction
+name: github-repo-maintainer-agent
 metadata:
-  template: azure-openai-entity-extraction@0.0.4
+  template: github-repo-maintainer-agent@0.0.4
 hooks:
   postprovision:
     windows:
