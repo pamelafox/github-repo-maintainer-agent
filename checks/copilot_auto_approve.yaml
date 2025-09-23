@@ -41,8 +41,4 @@ code_checks:
       - Reduces manual intervention for agent-created PRs
       - Maintains security by only auto-approving specific agent PRs
       
-    labels:
-      - "enhancement"
-      - "automation"
-      - "copilot"
     assignees: []

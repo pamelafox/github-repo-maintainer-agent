@@ -73,7 +73,8 @@ class CodeCheckConfig(BaseModel):
     directory_path: str | None = None  # Path to a directory to check all files within
     file_pattern: str | None = None  # Regex pattern to match filenames (when using directory_path)
     search_repo: bool = False  # If True, search entire repository using GitHub's search API
-    pattern: str   # The line of code or pattern to search for
+    pattern: str   # The query or pattern to search for (used for file selection/search API)
+    content_pattern: str | None = None  # Optional pattern to validate within matched files
     issue_title: str  # Title for the issue to create
     issue_description: str  # Description for the issue
     labels: list[str] = []  # Labels to apply to the issue

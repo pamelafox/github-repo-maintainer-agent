@@ -1,0 +1,47 @@
+# Code Check Configuration
+# This file defines patterns to search for in repository files and issues to create when found
+
+code_checks:
+  # Check GitHub workflow files for conditional Azure login steps
+  - directory_path: ".github/workflows"
+    file_pattern: "\\.ya?ml$"
+    pattern: "if: \\$\\{\\{ env\\.AZURE_CLIENT_ID != '' \\}\\}"
+    issue_title: "Remove conditional from Azure login step in deployment workflow"
+    issue_description: |
+      ## Issue Description
+      
+      The azd deployment workflow file contains a conditional Azure login step that should be simplified.
+      
+      ## Current Problem
+      
+      The workflow currently has a conditional login step using:
+      ```yaml
+      if: ${{ env.AZURE_CLIENT_ID != '' }}
+      ```
+      
+      ## Recommended Fix
+      
+      Modify the azd deployment workflow file so that the login step does not have a conditional. There should only be a single login step that looks like:
+      
+      ```yaml
+      - name: Log in with Azure (Federated Credentials)
+        run: |
+          azd auth login `
+            --client-id "$Env:AZURE_CLIENT_ID" `
+            --federated-credential-provider "github" `
+            --tenant-id "$Env:AZURE_TENANT_ID"
+        shell: pwsh
+      ```
+      
+      Remove any additional login step that uses "Client Credentials".
+      
+      ## Benefits
+      
+      - Simplifies the workflow logic
+      - Reduces complexity and potential failure points
+      - Ensures consistent authentication method
+      - Follows current best practices for Azure authentication in GitHub Actions
+      
+      Please review and update the affected workflow files to remove the conditional and consolidate to a single login step using Federated Credentials.
+    assignees:
+      - "copilot-swe-agent"

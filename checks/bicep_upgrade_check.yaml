@@ -28,9 +28,5 @@ code_checks:
       Make sure you do NOT check in any generated ARM JSON into git,
       delete generated JSON files (like infra/main.json) before committing.
 
-    labels:
-      - "bicep"
-      - "infrastructure"
-      - "maintenance"
     assignees:
       - "copilot-swe-agent"

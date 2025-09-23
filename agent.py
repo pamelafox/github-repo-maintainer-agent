@@ -225,11 +225,15 @@ class RepoMaintainerAgent:
                 
                 try:
                     # Check if issue already exists for this file/pattern combination
-                    existing_issue = await github.check_file_for_issue_exists(
-                        repo, check_target, check.pattern
+                    existing_issue = await github.issue_exists_with_title(
+                        repo, check.issue_title
                     )
                     if existing_issue:
-                        logger.info(f"Issue already exists for {check_target} pattern in {repo.name}")
+                        logger.info(
+                            "Issue '%s' already exists in %s, skipping",
+                            check.issue_title,
+                            repo.name,
+                        )
                         continue
                     
                     # Get file content(s) to check
@@ -247,7 +251,11 @@ class RepoMaintainerAgent:
                     elif check.search_repo:
                         # Use GitHub search API for repository-wide search
                         logger.info(f"Using search API to find '{check.pattern}' in {repo.name}")
-                        search_results = await github.search_code_in_repo(repo, check.pattern)
+                        search_results = await github.search_code_in_repo(
+                            repo,
+                            check.pattern,
+                            check.content_pattern,
+                        )
                         if not search_results:
                             logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name} via search API")
                             continue
@@ -270,7 +278,10 @@ class RepoMaintainerAgent:
                     else:
                         # Check files individually for pattern matches
                         for file_content in files_to_check:
-                            result = github.check_code_pattern(file_content, check.pattern)
+                            result = github.check_code_pattern(
+                                file_content,
+                                check.content_pattern or check.pattern,
+                            )
                             if result.matched:
                                 all_matches.append(result)
                     
@@ -288,7 +299,7 @@ class RepoMaintainerAgent:
                             template_vars = {
                                 "description": check.issue_description,
                                 "file_path": match.file_path,
-                                "pattern": check.pattern,
+                                "pattern": check.content_pattern or check.pattern,
                                 "matched_lines": match.matched_lines,
                                 "line_numbers": match.line_numbers,
                                 "repo_url": f"https://github.com/{repo.full_name}",
@@ -298,7 +309,7 @@ class RepoMaintainerAgent:
                             # Multiple files match
                             template_vars = {
                                 "description": check.issue_description,
-                                "pattern": check.pattern,
+                                "pattern": check.content_pattern or check.pattern,
                                 "repo_url": f"https://github.com/{repo.full_name}",
                                 "multiple_files": True,
                                 "matches": all_matches,

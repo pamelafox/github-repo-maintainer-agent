@@ -1,12 +1,28 @@
 ## Verification tips
 
+## Python virtual environment setup
+
 If you need to create a virtual environment, use the `.venv` folder, like:
 
 ```
 python -m venv .venv
 ```
 
+DO NOT use any other name for the virtual environment folder; only `.venv` is allowed.
+Make sure that your git commit does NOT include the `.venv` folder in the repository.
+
+### Installation check
+
 When you have updated packages, make sure you can install them successfully in the virtual environment.
 To decide what command to use to install the packages, check the repo's README.md and GitHub Actions workflows in the `.github/workflows` directory.
 
+### Testing check
+
+Run all tests to ensure everything is working correctly.
+The command to run the tests is usually specified in the README.md file or in the GitHub Actions workflows in the `.github/workflows` directory.
+
+## Communication guidelines
+
 Leave a comment on the PR indicating what command you used to verify successful installation.
+DO NOT add a file to the repository that describes the upgrade process.
+Your PR should be only the minimal changes needed to the requirements/code.
