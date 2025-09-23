@@ -151,7 +151,6 @@ This spec provides all details an LLM needs to implement the feature without rea
     AZURE_TENANT_ID=
     AZURE_OPENAI_SERVICE=
     AZURE_OPENAI_ENDPOINT=
-    AZURE_OPENAI_VERSION=2024-10-21
     AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o
     AZURE_OPENAI_CHAT_MODEL=gpt-4o
 
