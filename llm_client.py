@@ -1,6 +1,6 @@
 import os
 
-from openai import AsyncAzureOpenAI, AsyncOpenAI
+from openai import AsyncOpenAI
 from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -17,10 +17,9 @@ class LLMClient:
         elif api_host == "azure":
             from azure.identity import DefaultAzureCredential, get_bearer_token_provider
             token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
-            client = AsyncAzureOpenAI(
-                api_version=os.environ["AZURE_OPENAI_VERSION"],
-                azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-                azure_ad_token_provider=token_provider,
+            client = AsyncOpenAI(
+                base_url=os.environ["AZURE_OPENAI_ENDPOINT"],
+                api_key=token_provider,
             )
             model = OpenAIModel(os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT"], provider=OpenAIProvider(openai_client=client))
         else:
