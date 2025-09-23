@@ -159,7 +159,6 @@ For Azure OpenAI usage, you must also set:
     - `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI endpoint URL (e.g. `https://<your-resource>.openai.azure.com`)
     - `AZURE_OPENAI_DEPLOYMENT`: The deployment name for your model (e.g. `gpt-4o`)
     - `AZURE_OPENAI_MODEL` (optional): The model name (e.g. `gpt-4o`)
-    - `AZURE_OPENAI_API_VERSION` (optional): The API version (e.g. `2024-02-15-preview`)
 
 See the output of the Azure provisioning step or the comments in `infra/` for the exact variable names and values to use.
 
