@@ -38,7 +38,5 @@ code_checks:
           )
           MODEL_NAME = os.getenv("GITHUB_MODEL", "openai/gpt-4o")
       ```
-    labels:
-      - "github-repo-maintainer-agent"
     assignees:
       - "copilot-swe-agent"

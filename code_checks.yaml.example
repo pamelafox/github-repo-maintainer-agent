@@ -11,9 +11,6 @@ code_checks:
       Flask 2.x has been available since 2021 and includes important security updates and new features.
       
       Please consider upgrading to Flask 2.x or later.
-    labels:
-      - "dependencies"
-      - "security"
     assignees:
       - "copilot-swe-agent"
 
@@ -26,9 +23,6 @@ code_checks:
       This should never be enabled in production as it can expose sensitive information.
       
       Please ensure debug mode is disabled for production deployments.
-    labels:
-      - "security"
-      - "bug"
     assignees: []
 
   # Example: Check all GitHub workflow files for outdated action versions
@@ -40,9 +34,6 @@ code_checks:
       One or more GitHub workflow files are using outdated versions of actions/checkout.
       
       Please consider upgrading to actions/checkout@v4 or later for better performance and security.
-    labels:
-      - "github-actions"
-      - "maintenance"
     assignees: []
 
   # Example: Check all Python files for deprecated imports
@@ -54,9 +45,6 @@ code_checks:
       The 'imp' module has been deprecated since Python 3.4 and removed in Python 3.12.
       
       Please migrate to using 'importlib' instead.
-    labels:
-      - "python"
-      - "deprecation"
     assignees: []
 
   # Example: Check all workflow files for missing security configurations
@@ -68,7 +56,4 @@ code_checks:
       GitHub workflow files should explicitly define permissions for security best practices.
       
       Consider adding explicit permissions blocks to limit the scope of the GITHUB_TOKEN.
-    labels:
-      - "security"
-      - "github-actions"
     assignees: []

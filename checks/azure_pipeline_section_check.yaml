@@ -1,0 +1,36 @@
+# Code Check: Detect deprecated pipeline variables section in azure.yaml
+# This configuration looks for any azure.yaml file that still contains a 'pipeline:' section.
+# As of azd version 1.17.0, the pipeline variables section is no longer required because
+# azd will auto-detect variables from main.parameters.json. Repositories should remove it
+# and add a requiredVersions constraint instead.
+
+code_checks:
+  - file_path: "azure.yaml"
+    # We match on 'pipeline:'; presence implies legacy pipeline variables block likely exists.
+    # (The agent's line-based regex engine can't easily match multi-line blocks.)
+    pattern: "pipeline:"
+    issue_title: "Remove the pipeline: variables section from azure.yaml"
+    issue_description: |
+      As of azd version 1.17.0, the `pipeline:` `variables:` section in `azure.yaml` is no longer needed.
+      The Azure Developer CLI will auto-detect the needed variables from `main.parameters.json`.
+
+      Please update this repository's `azure.yaml` by:
+
+      1. Removing the entire `pipeline:` block (including nested `variables:` entries).
+      2. Adding (or updating) a `requiredVersions` section to enforce a modern azd version:
+
+         ```yaml
+         requiredVersions:
+           azd: ">= 1.17.0"
+         ```
+      3. If the file uses a `metadata.template` version, bump that version to indicate the change.
+      4. Re-run `azd up` or your standard CI workflow to ensure everything still provisions correctly.
+
+      Rationale:
+      - Simplifies configuration (variables now inferred automatically)
+      - Reduces duplication and risk of drift
+      - Aligns with current azd best practices
+
+      After making the change, commit and open a PR referencing this issue.
+    assignees:
+      - "copilot-swe-agent"

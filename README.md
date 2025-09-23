@@ -302,6 +302,10 @@ Examples:
 
 An example configuration file is provided at `code_checks.yaml.example`.
 
+You can ask GitHub Copilot to write a code check YAML based off an existing issue using a prompt like:
+
+> Add a new code check file based off #file:code_checks.yaml.example that will look for azure.yaml files with pipeline section in them. If so, it should create an issue like this one #fetch https://github.com/Azure-Samples/openai-chat-app-quickstart/issues/327
+
 ### Using a YAML configuration file
 
 You can specify repositories to process using a YAML file with the following structure:

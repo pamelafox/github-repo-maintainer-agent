@@ -981,42 +981,61 @@ class GitHubClient:
             matched_lines=matched_lines
         )
 
-    async def check_file_for_issue_exists(self, repo: Repository, file_path: str, pattern: str) -> bool:
-        """Check if an issue already exists for a specific file/pattern combination.
-        
+    async def issue_exists_with_title(self, repo: Repository, title: str) -> bool:
+        """Determine whether an open issue already exists with the given title.
+
         Args:
-            repo: The repository to check
-            file_path: The file path that was checked
-            pattern: The pattern that was searched for
-            
+            repo: Repository being scanned.
+            title: Exact issue title to look for.
+
         Returns:
-            True if an issue already exists, False otherwise
+            True when an open issue (not PR) with the matching title exists.
         """
-        try:
-            # Search for existing issues with specific labels or title pattern
-            search_query = f"repo:{repo.full_name} is:issue is:open code-check"
-            url = f"{GITHUB_API_URL}/search/issues"
-            params = {"q": search_query}
-            
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.get(url, headers=self.headers, params=params)
-                resp.raise_for_status()
-                data = resp.json()
-            
-            # Check if any existing issues mention the specific file and pattern
-            for issue in data.get("items", []):
-                title = issue.get("title", "").lower()
-                body = issue.get("body", "").lower()
-                if file_path.lower() in title or file_path.lower() in body:
-                    if pattern.lower() in title or pattern.lower() in body:
-                        logger.info(f"Found existing issue #{issue['number']} for {file_path} pattern in {repo.full_name}")
+        url = f"{GITHUB_API_URL}/repos/{repo.owner}/{repo.name}/issues?state=open&per_page=100"
+
+        while url:
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    resp = await client.get(url, headers=self.headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+
+                for issue in data:
+                    if issue.get("pull_request"):
+                        continue
+                    if issue.get("title") == title:
+                        logger.info(
+                            "Found existing open issue #%s with title '%s' in %s",
+                            issue.get("number"),
+                            title,
+                            repo.full_name,
+                        )
                         return True
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f"Error checking for existing issues in {repo.full_name}: {e}")
-            return False  # Assume no existing issue if we can't check
+
+                url = self._get_next_url_from_link_header(resp.headers.get('link', ''))
+            except httpx.TimeoutException as exc:
+                logger.warning(
+                    "Timeout encountered while checking existing issues for %s: %s",
+                    repo.full_name,
+                    exc,
+                )
+                return False
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "HTTP error while checking existing issues for %s: %s",
+                    repo.full_name,
+                    exc,
+                )
+                return False
+            except Exception as exc:  # noqa: BLE001 - log unexpected failure
+                logger.error(
+                    "Unexpected error while checking existing issues for %s: %s",
+                    repo.full_name,
+                    exc,
+                )
+                return False
+
+        return False
 
     def _extract_last_lines_before_completion(self, log_content: str, line_count: int = 20) -> str:
         """Extract the last N lines before 'Process completed' in a log file."""
@@ -1051,7 +1070,12 @@ class GitHubClient:
         wait=wait_exponential(multiplier=60, min=60, max=900),  # Start with 60s, then 120s, 240s (capped at 15min)
         reraise=True
     )
-    async def search_code_in_repo(self, repo: Repository, query: str) -> list[CodeMatchResult]:
+    async def search_code_in_repo(
+        self,
+        repo: Repository,
+        query: str,
+        content_pattern: str | None = None,
+    ) -> list[CodeMatchResult]:
         """Search for code patterns in a repository using GitHub's search API.
         
         Args:
@@ -1083,24 +1107,15 @@ class GitHubClient:
                 
                 # Get the actual file content to find exact matches
                 file_content = await self.get_file_content(repo, file_path)
-                if file_content and query in file_content.content:
-                    # Find line numbers where the pattern occurs
-                    lines = file_content.content.split('\n')
-                    matching_line_numbers = []
-                    matching_lines = []
-                    for line_num, line in enumerate(lines, 1):
-                        if query in line:
-                            matching_line_numbers.append(line_num)
-                            matching_lines.append(line.strip())
-                    
-                    if matching_line_numbers:
-                        results.append(CodeMatchResult(
-                            file_path=file_path,
-                            pattern=query,
-                            matched=True,
-                            line_numbers=matching_line_numbers,
-                            matched_lines=matching_lines
-                        ))
+                if not file_content:
+                    continue
+
+                match_result = self.check_code_pattern(
+                    file_content,
+                    content_pattern or query,
+                )
+                if match_result.matched:
+                    results.append(match_result)
             
             logger.info(f"Found {len(results)} files with matches for '{query}' in {repo.full_name}")
             return results

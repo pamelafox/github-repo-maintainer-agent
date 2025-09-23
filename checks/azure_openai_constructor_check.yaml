@@ -1,0 +1,59 @@
+# Code Check Configuration
+# Flags AzureOpenAI constructors that need migrating to the latest OpenAI SDK patterns
+
+code_checks:
+  - search_repo: true
+    pattern: "AzureOpenAI extension:py"
+    content_pattern: "\\b(?:AzureOpenAI|AsyncAzureOpenAI)\\s*\\("
+    issue_title: "Migrate AzureOpenAI constructors to OpenAI client"
+    issue_description: |
+      ## Issue Description
+
+      This repository is using the Azure-specific client constructors from the OpenAI SDK:
+      `AzureOpenAI` or `AsyncAzureOpenAI`.
+
+      These constructors are deprecated in the latest SDKs. Migrate to the standard
+      `OpenAI` / `AsyncOpenAI` constructors instead so the code stays compatible with the
+      current API surface.
+
+      ## Required Updates
+
+      1. **Replace constructors**
+         ```python
+         # Before
+         client = openai.AzureOpenAI(
+             api_version=os.environ["AZURE_OPENAI_VERSION"],
+             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+             azure_ad_token_provider=token_provider,
+         )
+
+         # After
+         client = openai.OpenAI(
+             base_url=os.environ["AZURE_OPENAI_ENDPOINT"],
+             api_key=token_provider,
+         )
+         ```
+
+         * `AzureOpenAI` → `OpenAI` (or `AsyncAzureOpenAI` → `AsyncOpenAI`).
+         * `azure_endpoint` → `base_url`.
+         * `azure_ad_token_provider` (or similar Azure credential helpers) → `api_key`.
+
+      2. **Remove `api_version` usage**
+         * Delete the `api_version=...` argument from client construction.
+         * Remove any `AZURE_OPENAI_VERSION` environment variables and references (including
+           `.env`, application settings, and `infra/main.bicep` or other Bicep files).
+
+      3. **Update package requirements**
+         * Ensure `requirements.txt` or `pyproject.toml` declares `openai>=1.108.1`.
+           This is the first version where `OpenAI` / `AsyncOpenAI` fully replace the
+           Azure-specific constructors.
+
+      ## Follow-up Checklist
+
+      - [ ] All Python client instantiations use `OpenAI` / `AsyncOpenAI`.
+      - [ ] No `api_version` argument or related environment variables remain.
+      - [ ] Dependency metadata requires `openai>=1.108.1`.
+
+      Addressing these items will keep the repository aligned with the supported OpenAI SDK usage.
+    assignees:
+      - "copilot-swe-agent"

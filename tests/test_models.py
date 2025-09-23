@@ -38,7 +38,7 @@ def test_issue_payload_from_template_with_logs():
     assert template_vars["pr_url"] in issue.body
     assert template_vars["summary"] in issue.body
     assert "Relevant logs:" in issue.body
-    assert "Python Virtual Environment Setup" in issue.body
+    assert "## Python virtual environment setup" in issue.body
     assert "python -m venv .venv" in issue.body
     for log in template_vars["related_logs"]:
         assert log in issue.body
@@ -71,6 +71,6 @@ def test_issue_payload_from_template_no_logs():
     
     # Verify the body contains expected content from the template
     assert template_vars["pr_url"] in issue.body
-    assert "no logs are available" in issue.body.lower()
-    assert "Python Virtual Environment Setup" in issue.body
+    assert "## verification tips" in issue.body.lower()
+    assert "## Python virtual environment setup" in issue.body
     assert "python -m venv .venv" in issue.body
