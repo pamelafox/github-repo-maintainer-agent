@@ -1,5 +1,6 @@
 {{ description }}
 
+{% if pattern %}
 ## Details
 
 **Pattern:** `{{ pattern }}`
@@ -32,6 +33,7 @@
 {% endif %}
 
 **Repository:** {{ repo_url }}
+{% endif %}
 
 ---
 *This issue was automatically created by the GitHub Repo Maintainer Agent.*
