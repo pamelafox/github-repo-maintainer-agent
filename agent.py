@@ -201,7 +201,7 @@ class RepoMaintainerAgent:
         total_issues = 0
         
         for repo in repos:
-            logger.info(f"Checking repository: {repo.full_name}")
+            logger.info(f"{repo.full_name}: Checking repository")
             
             # Get the appropriate GitHub client for this repository
             repo_org = None if repo.is_personal else repo.owner
@@ -213,15 +213,16 @@ class RepoMaintainerAgent:
                 # Determine what we're checking
                 if check.file_path:
                     check_target = check.file_path
-                    logger.info(f"Checking {repo.name} for pattern '{check.pattern}' in file {check.file_path}")
+                    check_pattern = f'with pattern {check.pattern}' if check.pattern else ''
+                    logger.info(f"{repo.name}: Checking for file {check.file_path} {check_pattern}")
                 elif check.search_repo:
                     check_target = "entire repository"
-                    logger.info(f"Checking {repo.name} for pattern '{check.pattern}' across entire repository using search API")
+                    logger.info(f"{repo.name}:Checking for pattern '{check.pattern}' across entire repository using search API")
                 else:
                     check_target = f"{check.directory_path}/*"
                     if check.file_pattern:
                         check_target += f" (files matching: {check.file_pattern})"
-                    logger.info(f"Checking {repo.name} for pattern '{check.pattern}' in directory {check.directory_path}")
+                    logger.info(f"{repo.name}: Checking for pattern '{check.pattern}' in directory {check.directory_path}")
                 
                 try:
                     # Check if issue already exists for this file/pattern combination
@@ -229,35 +230,44 @@ class RepoMaintainerAgent:
                         repo, check.issue_title
                     )
                     if existing_issue:
-                        logger.info(
-                            "Issue '%s' already exists in %s, skipping",
-                            check.issue_title,
-                            repo.name,
-                        )
+                        logger.info(f"{repo.name}: Issue '{check.issue_title}' already exists, skipping")
                         continue
                     
                     # Get file content(s) to check
                     files_to_check = []
                     search_results = []
+                    template_vars = None
+                    issue_type = "code pattern"
                     
                     if check.file_path:
                         # Single file check
                         file_content = await github.get_file_content(repo, check.file_path)
                         if file_content:
+                            if check.check_missing:
+                                # If file exists but we're checking for missing files, skip
+                                logger.info(f"{repo.name}: File {check.file_path} exists, skipping missing file check")
+                                continue
                             files_to_check.append(file_content)
                         else:
-                            logger.info(f"File {check.file_path} not found in {repo.name}")
-                            continue
+                            logger.info(f"{repo.name}: File {check.file_path} not found")
+                            if check.check_missing:
+                                template_vars = {
+                                    "description": check.issue_description,
+                                }
+                                issue_type = f"missing file {check.file_path}"
+                                total_matches += 1
+                            else:
+                                continue
                     elif check.search_repo:
                         # Use GitHub search API for repository-wide search
-                        logger.info(f"Using search API to find '{check.pattern}' in {repo.name}")
+                        logger.info(f"{repo.name}: Using search API to find '{check.pattern}'")
                         search_results = await github.search_code_in_repo(
                             repo,
                             check.pattern,
                             check.content_pattern,
                         )
                         if not search_results:
-                            logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name} via search API")
+                            logger.info(f"{repo.name}: No matches found for pattern '{check.pattern}' via search API")
                             continue
                     else:
                         # Directory check (traditional method)
@@ -265,59 +275,68 @@ class RepoMaintainerAgent:
                             repo, check.directory_path, check.file_pattern
                         )
                         if not files_to_check:
-                            logger.info(f"No files found in directory {check.directory_path} in {repo.name}")
+                            logger.info(f"{repo.name}: No files found in directory {check.directory_path}")
                             continue
-                        logger.info(f"Found {len(files_to_check)} files to check in {check.directory_path}")
-                    
-                    # Check for pattern matches
-                    all_matches = []
-                    
-                    if search_results:
-                        # Use search results directly
-                        all_matches = search_results
-                    else:
-                        # Check files individually for pattern matches
-                        for file_content in files_to_check:
-                            result = github.check_code_pattern(
-                                file_content,
-                                check.content_pattern or check.pattern,
-                            )
-                            if result.matched:
-                                all_matches.append(result)
-                    
-                    if all_matches:
-                        total_matches += 1
-                        total_matched_files = len(all_matches)
-                        total_matched_lines = sum(len(match.matched_lines) for match in all_matches)
+                        logger.info(f"{repo.name}: Found {len(files_to_check)} files to check in {check.directory_path}")
+
+                    # Check for pattern matches (skip if template_vars already set for missing file)
+                    if template_vars is None:
+                        all_matches = []
                         
-                        logger.info(f"Found {total_matched_lines} matches across {total_matched_files} files in {repo.name}")
-                        
-                        # Prepare template variables for multiple files
-                        if len(all_matches) == 1:
-                            # Single file match
-                            match = all_matches[0]
-                            template_vars = {
-                                "description": check.issue_description,
-                                "file_path": match.file_path,
-                                "pattern": check.content_pattern or check.pattern,
-                                "matched_lines": match.matched_lines,
-                                "line_numbers": match.line_numbers,
-                                "repo_url": f"https://github.com/{repo.full_name}",
-                                "multiple_files": False
-                            }
+                        if search_results:
+                            # Use search results directly
+                            all_matches = search_results
                         else:
-                            # Multiple files match
-                            template_vars = {
-                                "description": check.issue_description,
-                                "pattern": check.content_pattern or check.pattern,
-                                "repo_url": f"https://github.com/{repo.full_name}",
-                                "multiple_files": True,
-                                "matches": all_matches,
-                                "total_files": total_matched_files,
-                                "total_lines": total_matched_lines
-                            }
+                            # Check files individually for pattern matches
+                            for file_content in files_to_check:
+                                result = github.check_code_pattern(
+                                    file_content,
+                                    check.content_pattern or check.pattern,
+                                )
+                                if result.matched:
+                                    all_matches.append(result)
                         
-                        # Create issue
+                        if all_matches:
+                            total_matches += 1
+                            total_matched_files = len(all_matches)
+                            total_matched_lines = sum(len(match.matched_lines) for match in all_matches)
+
+                            logger.info(f"{repo.name}: Found {total_matched_lines} matches across {total_matched_files} files")
+
+                            # Prepare template variables for pattern matches
+                            if len(all_matches) == 1:
+                                # Single file match
+                                match = all_matches[0]
+                                template_vars = {
+                                    "description": check.issue_description,
+                                    "file_path": match.file_path,
+                                    "pattern": check.content_pattern or check.pattern,
+                                    "matched_lines": match.matched_lines,
+                                    "line_numbers": match.line_numbers,
+                                    "repo_url": f"https://github.com/{repo.full_name}",
+                                    "multiple_files": False
+                                }
+                            else:
+                                # Multiple files match
+                                template_vars = {
+                                    "description": check.issue_description,
+                                    "pattern": check.content_pattern or check.pattern,
+                                    "repo_url": f"https://github.com/{repo.full_name}",
+                                    "multiple_files": True,
+                                    "matches": all_matches,
+                                    "total_files": total_matched_files,
+                                    "total_lines": total_matched_lines
+                                }
+                        else:
+                            if check.file_path:
+                                logger.info(f"{repo.name}: No matches found for pattern '{check.pattern}' in {check.file_path}")
+                            elif check.search_repo:
+                                logger.info(f"{repo.name}: No matches found for pattern '{check.pattern}' in entire repo")
+                            else:
+                                logger.info(f"{repo.name}: No matches found for pattern '{check.pattern}' in {check.directory_path}")
+
+                    # Create issue if we have template vars (from either missing file or pattern match)
+                    if template_vars:
                         issue = IssuePayload.from_template(
                             title=check.issue_title,
                             template_path="code_check_issue.jinja2",
@@ -326,36 +345,39 @@ class RepoMaintainerAgent:
                             assignees=check.assignees,
                         )
                         
-                        if self.dry_run:
-                            logger.info(f"[DRY RUN] Would create issue in {repo.name}: {issue.title}")
-                        else:
-                            try:
-                                created = await github.create_issue_graphql(repo, issue)
-                                logger.info(f"Created issue {created['html_url']} for code pattern in {repo.name}")
-                                total_issues += 1
-                            except Exception as e:
-                                import traceback
-                                logger.error(f"Failed to create issue in {repo.name} for code pattern: {e}")
-                                try:
-                                    import httpx
-                                    if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
-                                        logger.error(f"Response content: {e.response.text}")
-                                except Exception:
-                                    logger.error("Could not read response content or httpx not available.")
-                                logger.error(traceback.format_exc())
-                    else:
-                        if check.file_path:
-                            logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name}/{check.file_path}")
-                        elif check.search_repo:
-                            logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name} (searched entire repo)")
-                        else:
-                            logger.info(f"No matches found for pattern '{check.pattern}' in {repo.name}/{check.directory_path}")
+                        if await self._create_issue(github, repo, issue, issue_type):
+                            total_issues += 1
                         
                 except Exception as e:
-                    logger.error(f"Error checking {repo.name}/{check_target}: {e}")
+                    logger.error(f"{repo.name}: Error checking {check_target}: {e}")
                     continue
         
         logger.info(f"Code pattern scan complete. Checks performed: {total_checks}, Matches found: {total_matches}, Issues created: {total_issues}")
+
+    async def _create_issue(self, github: GitHubClient, repo, issue: IssuePayload, issue_type: str = "code pattern") -> bool:
+        """Common issue creation logic with error handling.
+        
+        Returns True if issue was created successfully, False otherwise.
+        """
+        if self.dry_run:
+            logger.info(f"{repo.name}: [DRY RUN] Would create issue: {issue.title}")
+            return True
+        else:
+            try:
+                created = await github.create_issue_graphql(repo, issue)
+                logger.info(f"{repo.name}: Created issue {created['html_url']} for {issue_type}")
+                return True
+            except Exception as e:
+                import traceback
+                logger.error(f"{repo.name}: Failed to create issue for {issue_type}: {e}")
+                try:
+                    import httpx
+                    if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
+                        logger.error(f"Response content: {e.response.text}")
+                except Exception:
+                    logger.error("Could not read response content or httpx not available.")
+                logger.error(traceback.format_exc())
+                return False
 
 if __name__ == "__main__":
     load_dotenv(override=True)

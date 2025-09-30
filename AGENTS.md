@@ -8,6 +8,8 @@ Run a code check with:
 .venv/bin/python agent.py code-check --config <code_check_file.yaml> --repos-yaml repos.yaml --dry-run
 ```
 
+ALWAYS run inside the virtual environment, since it has access to the packages.
+
 ## Adding a new code check
 
 When adding a new code check, follow the example from code_checks.yaml.example

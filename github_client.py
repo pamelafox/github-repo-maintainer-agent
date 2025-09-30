@@ -844,7 +844,6 @@ class GitHubClient:
             
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                logger.info(f"File {file_path} not found in {repo.full_name}")
                 return None
             logger.error(f"HTTP error fetching file {file_path} from {repo.full_name}: {e}")
             raise
@@ -893,7 +892,6 @@ class GitHubClient:
             
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                logger.info(f"Directory {directory_path} not found in {repo.full_name}")
                 return []
             logger.error(f"HTTP error fetching directory {directory_path} from {repo.full_name}: {e}")
             raise

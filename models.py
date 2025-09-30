@@ -73,7 +73,8 @@ class CodeCheckConfig(BaseModel):
     directory_path: str | None = None  # Path to a directory to check all files within
     file_pattern: str | None = None  # Regex pattern to match filenames (when using directory_path)
     search_repo: bool = False  # If True, search entire repository using GitHub's search API
-    pattern: str   # The query or pattern to search for (used for file selection/search API)
+    check_missing: bool = False  # If True, create issue when file_path does NOT exist
+    pattern: str | None = None   # The query or pattern to search for (used for file selection/search API)
     content_pattern: str | None = None  # Optional pattern to validate within matched files
     issue_title: str  # Title for the issue to create
     issue_description: str  # Description for the issue
@@ -92,6 +93,14 @@ class CodeCheckConfig(BaseModel):
             raise ValueError("Must specify one of: file_path, directory_path, or search_repo=True")
         if options_count > 1:
             raise ValueError("Cannot specify more than one of: file_path, directory_path, or search_repo=True")
+        
+        # check_missing can only be used with file_path
+        if self.check_missing and not self.file_path:
+            raise ValueError("check_missing=True can only be used with file_path")
+        
+        # pattern is required unless check_missing is True
+        if not self.check_missing and not self.pattern:
+            raise ValueError("pattern is required unless check_missing=True")
 
 
 class FileContent(BaseModel):
