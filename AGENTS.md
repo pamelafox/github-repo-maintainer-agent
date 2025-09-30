@@ -33,9 +33,16 @@ Understanding how the agent matches patterns helps you author effective checks.
 - Anchors (`^`, `$`) refer to the beginning / end of an individual line, not the entire file.
 - There is currently no flag control (e.g., DOTALL / MULTILINE) exposed via configuration.
 
+#### Checking for missing files (`check_missing: true`)
+
+- When `check_missing: true` is set, the check creates an issue when the specified `file_path` does NOT exist in the repository.
+- This option can ONLY be used with `file_path` (not with `directory_path` or `search_repo`).
+- When using `check_missing: true`, the `pattern` field is optional and not required (since you're checking for file absence, not content).
+- This is useful for ensuring required files are present (e.g., security policies, documentation, CI/CD configurations).
+
 #### Repository-wide search (`search_repo: true`)
 
-- When `search_repo: true` is set, the GitHub Code Search API is used with the raw text of `pattern` (NOT treated as a regex by GitHub’s side — it is a plain string query unless GitHub natively interprets operators).
+- When `search_repo: true` is set, the GitHub Code Search API is used with the raw text of `pattern` (NOT treated as a regex by GitHub's side — it is a plain string query unless GitHub natively interprets operators).
 - The agent then fetches each matching file and does a simple substring check for the same text to confirm matches and extract line numbers.
 - Because of this, for repository-wide searches you should normally use a simple literal fragment (e.g. `from imp import` or `actions/checkout@v1`).
 
@@ -48,6 +55,7 @@ Understanding how the agent matches patterns helps you author effective checks.
 | Limit to certain extensions | Add `file_pattern: "\\.ya?ml$"` or similar |
 | Fast literal match anywhere in repo | `search_repo: true` (pattern as literal) |
 | Need regex features (captures, alternation) | Use `file_path` or `directory_path` (NOT `search_repo`) |
+| Ensure a required file exists | `file_path: "SECURITY.md"` + `check_missing: true` |
 
 #### Escaping tips
 
@@ -74,6 +82,18 @@ code_checks:
     issue_title: "Outdated urllib3 1.x detected"
     issue_description: |
       urllib3 2.x includes improvements...
+```
+
+Check for missing required file:
+
+```yaml
+code_checks:
+  - file_path: "SECURITY.md"
+    check_missing: true
+    issue_title: "Missing SECURITY.md file"
+    issue_description: |
+      This repository should have a SECURITY.md file to document
+      the security policy and how to report vulnerabilities.
 ```
 
 Directory + filename filter:
