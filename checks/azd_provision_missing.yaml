@@ -1,0 +1,71 @@
+code_checks:
+  - directory_path: ".github/workflows"
+    file_pattern: "\\.ya?ml$"
+    pattern: "azd provision"
+    issue_if_missing: true
+    issue_title: "Add azd provision workflow to automate Azure infrastructure provisioning"
+    issue_description: |
+      This repository lacks a GitHub Actions workflow within `.github/workflows/` that runs `azd provision`.
+
+      Adding a CI workflow that provisions (and later deploys) infrastructure via the Azure Developer CLI improves reliability and makes onboarding smoother.
+
+      ## Required Action
+
+      Add a workflow similar to the standard `azure-dev.yaml` used in Azure Samples. A minimal example:
+
+      ```yaml
+      name: Deploy to Azure with azd
+      on:
+        workflow_dispatch:
+        push:
+          branches: [ main ]
+
+      permissions:
+        id-token: write
+        contents: read
+
+      jobs:
+        build:
+          runs-on: ubuntu-latest
+          steps:
+            - name: Checkout
+              uses: actions/checkout@v5
+
+            - name: Install azd
+              uses: Azure/setup-azd@v2
+
+            - name: Azure login (federated)
+              run: |
+                azd auth login --client-id "$AZURE_CLIENT_ID" \
+                  --tenant-id "$AZURE_TENANT_ID" --federated-credential-provider github
+              env:
+                AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+                AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+
+            - name: Provision Infrastructure
+              run: |
+                azd provision --no-prompt
+              env:
+                AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+                AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+                AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+
+            - name: Deploy Application
+              run: |
+                azd deploy --no-prompt
+              env:
+                AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+                AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+                AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      ```
+
+      For a more complete example (including environment variables for Azure OpenAI, etc.), see the reference workflow in the Azure Samples repository.
+
+      ## Rationale
+      - Ensures infra is provisioned consistently by automation
+      - Enables repeatable environments via azd
+      - Aligns with current Azure Developer CLI best practices
+
+      After adding the workflow, ensure required org/repo variables and federated credentials are configured (run `azd pipeline config` locally if needed).
+    assignees:
+      - "copilot-swe-agent"

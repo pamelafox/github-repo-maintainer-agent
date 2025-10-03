@@ -295,45 +295,62 @@ class RepoMaintainerAgent:
                                 )
                                 if result.matched:
                                     all_matches.append(result)
-                        
+                        # If we found matches and it's a normal (non inverse) check, proceed.
+                        # If we did NOT find matches but issue_if_missing is True, we create an issue.
                         if all_matches:
-                            total_matches += 1
-                            total_matched_files = len(all_matches)
-                            total_matched_lines = sum(len(match.matched_lines) for match in all_matches)
-
-                            logger.info(f"{repo.name}: Found {total_matched_lines} matches across {total_matched_files} files")
-
-                            # Prepare template variables for pattern matches
-                            if len(all_matches) == 1:
-                                # Single file match
-                                match = all_matches[0]
-                                template_vars = {
-                                    "description": check.issue_description,
-                                    "file_path": match.file_path,
-                                    "pattern": check.content_pattern or check.pattern,
-                                    "matched_lines": match.matched_lines,
-                                    "line_numbers": match.line_numbers,
-                                    "repo_url": f"https://github.com/{repo.full_name}",
-                                    "multiple_files": False
-                                }
+                            # If this is an inverse (issue_if_missing) check, do NOT create an issue
+                            if check.issue_if_missing:
+                                logger.info(f"{repo.name}: Pattern present; inverse check satisfied (no issue).")
                             else:
-                                # Multiple files match
-                                template_vars = {
-                                    "description": check.issue_description,
-                                    "pattern": check.content_pattern or check.pattern,
-                                    "repo_url": f"https://github.com/{repo.full_name}",
-                                    "multiple_files": True,
-                                    "matches": all_matches,
-                                    "total_files": total_matched_files,
-                                    "total_lines": total_matched_lines
-                                }
+                                total_matches += 1
+                                total_matched_files = len(all_matches)
+                                total_matched_lines = sum(len(match.matched_lines) for match in all_matches)
+
+                                logger.info(f"{repo.name}: Found {total_matched_lines} matches across {total_matched_files} files")
+
+                                # Prepare template variables for pattern matches
+                                if len(all_matches) == 1:
+                                    # Single file match
+                                    match = all_matches[0]
+                                    template_vars = {
+                                        "description": check.issue_description,
+                                        "file_path": match.file_path,
+                                        "pattern": check.content_pattern or check.pattern,
+                                        "matched_lines": match.matched_lines,
+                                        "line_numbers": match.line_numbers,
+                                        "repo_url": f"https://github.com/{repo.full_name}",
+                                        "multiple_files": False
+                                    }
+                                else:
+                                    # Multiple files match
+                                    template_vars = {
+                                        "description": check.issue_description,
+                                        "pattern": check.content_pattern or check.pattern,
+                                        "repo_url": f"https://github.com/{repo.full_name}",
+                                        "multiple_files": True,
+                                        "matches": all_matches,
+                                        "total_files": total_matched_files,
+                                        "total_lines": total_matched_lines
+                                    }
                         else:
+                            # No matches scenario
                             if check.file_path:
                                 logger.info(f"{repo.name}: No matches found for pattern '{check.pattern}' in {check.file_path}")
                             elif check.search_repo:
                                 logger.info(f"{repo.name}: No matches found for pattern '{check.pattern}' in entire repo")
                             else:
                                 logger.info(f"{repo.name}: No matches found for pattern '{check.pattern}' in {check.directory_path}")
+
+                            if check.issue_if_missing:
+                                # Create issue because pattern is missing
+                                template_vars = {
+                                    "description": check.issue_description,
+                                    "pattern": check.content_pattern or check.pattern,
+                                    "repo_url": f"https://github.com/{repo.full_name}",
+                                    "multiple_files": False,
+                                    "matched_lines": [],
+                                    "line_numbers": [],
+                                }
 
                     # Create issue if we have template vars (from either missing file or pattern match)
                     if template_vars:
