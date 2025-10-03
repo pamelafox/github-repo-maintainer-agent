@@ -1,0 +1,87 @@
+code_checks:
+  - file_path: "AGENTS.md"
+    check_missing: true
+    issue_title: "Add AGENTS.md to this repository for coding agent onboarding"
+    issue_description: |
+      ## Issue Description
+
+      This repository is missing an `AGENTS.md` file at the root. That file is used to **onboard a coding agent (like GitHub Copilot's automation agents)** so it can work efficiently and correctly in this codebase.
+
+      Providing high-quality, explicit repository instructions dramatically reduces:
+      - Broken or failing CI / build attempts
+      - Wasted exploration (grep/find excessive searches)
+      - Incorrect environment setup
+      - PR churn due to missing context
+
+      ## Required Action
+
+      Create a new `AGENTS.md` file in the repository root with the following high‑level sections (in this order):
+
+      1. **Overview** – What the project does, main technologies, primary entry points.
+      2. **Code layout** – Bullet list of important files / folders with brief purpose (Python modules, infra/Bicep, workflows, scripts, config). Omit trivial or generated files.
+      3. **Running the code** – Step‑by‑step environment setup (preferred Python version / tool, how to install deps, how to run main scripts). Prefer using GitHub Models if applicable over Azure-only model configs.
+      4. **Running the tests** – Exact commands to run the test suite (include any required env vars, virtualenv activation, or formatting/lint steps if enforced by CI).
+      5. **Upgrading Python dependencies** – How to add or upgrade a dependency (e.g., edit `requirements.txt` and run a pin/update command). Include any tools (pip, uv, etc.).
+      6. **Release / build / deployment notes** (if applicable) – Any scripts, workflows, or manual steps the agent must respect.
+      7. **Conventions & gotchas** – Linting rules, code style, required env vars, secrets handling, common pitfalls.
+      8. **Validation checklist** – A short ordered list the agent should follow before opening a PR (e.g., tests pass locally, formatting applied, no stray debug prints, etc.).
+      9. **When to search** – A closing note instructing the agent to trust `AGENTS.md` and only perform source-wide searches if information is missing or incorrect.
+
+      ## Authoring Guidelines (Summarized from canonical AGENTS.md guidance)
+
+      - Be explicit: Prefer concrete commands over prose (e.g., `pytest -q` not “run tests”).
+      - Verify every command before including it.
+      - List required environment variables and how they’re obtained.
+      - Document any non-obvious build or test ordering.
+      - Surface known flaky areas, hacks, or TODO hotspots if they affect modification strategy.
+      - Keep it concise but information-dense—optimize for an automated agent, not a marketing audience.
+
+      ## Example Skeleton
+
+      ```markdown
+      # AGENTS.md
+
+      ## Overview
+      <1–3 paragraph summary>
+
+      ## Code layout
+      - `agent.py` – Entry point for ...
+      - `checks/` – YAML definitions for automated repo code checks
+      - `infra/` – Bicep templates for infra provisioning
+      - `.github/workflows/` – CI/CD workflows
+      ...
+
+      ## Running the code
+      1. Create virtual environment: `python -m venv .venv && source .venv/bin/activate`
+      2. Install deps: `pip install -r requirements.txt`
+      3. Run main script: `python agent.py --help`
+
+      ## Running the tests
+      ```bash
+      source .venv/bin/activate
+      pytest -q
+      ```
+
+      ## Upgrading Python dependencies
+      Edit `requirements.txt`, then: `pip install -r requirements.txt` and run tests.
+
+      ## Validation checklist
+      - [ ] Virtualenv active
+      - [ ] `pytest -q` passes
+      - [ ] No debug prints
+      - [ ] Updated docs if behavior changed
+
+      ## When to search
+      Only search the codebase if required info is missing or appears outdated.
+      ```
+
+      ## Acceptance Criteria
+
+      - `AGENTS.md` exists at repository root
+      - Contains all required sections above
+      - Commands verified and minimal
+      - Provides actionable, agent-focused guidance
+
+      Adding this file will significantly improve automated contribution quality.
+    assignees:
+      - "copilot-swe-agent"

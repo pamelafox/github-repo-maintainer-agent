@@ -76,6 +76,7 @@ class CodeCheckConfig(BaseModel):
     check_missing: bool = False  # If True, create issue when file_path does NOT exist
     pattern: str | None = None   # The query or pattern to search for (used for file selection/search API)
     content_pattern: str | None = None  # Optional pattern to validate within matched files
+    issue_if_missing: bool = False  # If True, create an issue if the pattern is NOT found (inverse logic)
     issue_title: str  # Title for the issue to create
     issue_description: str  # Description for the issue
     labels: list[str] = []  # Labels to apply to the issue
@@ -101,6 +102,14 @@ class CodeCheckConfig(BaseModel):
         # pattern is required unless check_missing is True
         if not self.check_missing and not self.pattern:
             raise ValueError("pattern is required unless check_missing=True")
+
+        # issue_if_missing cannot be combined with check_missing (they serve different purposes)
+        if self.issue_if_missing and self.check_missing:
+            raise ValueError("issue_if_missing cannot be used with check_missing")
+
+        # issue_if_missing currently only supported for directory_path or file_path (not search_repo)
+        if self.issue_if_missing and self.search_repo:
+            raise ValueError("issue_if_missing is not supported with search_repo=True (use directory_path or file_path)")
 
 
 class FileContent(BaseModel):
