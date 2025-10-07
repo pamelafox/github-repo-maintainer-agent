@@ -59,7 +59,8 @@ code_checks:
                 AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
       ```
 
-      For a more complete example (including environment variables for Azure OpenAI, etc.), see the reference workflow in the Azure Samples repository.
+      For a more complete example (including environment variables based off main.parameters.json),
+      see https://github.com/Azure-Samples/azure-search-openai-demo/blob/main/.github/workflows/azure-dev.yml
 
       ## Rationale
       - Ensures infra is provisioned consistently by automation

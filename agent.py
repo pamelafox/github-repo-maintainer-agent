@@ -199,6 +199,7 @@ class RepoMaintainerAgent:
         total_checks = 0
         total_matches = 0
         total_issues = 0
+        repos_with_issues = []  # Track repositories where issues would be created
         
         for repo in repos:
             logger.info(f"{repo.full_name}: Checking repository")
@@ -364,12 +365,25 @@ class RepoMaintainerAgent:
                         
                         if await self._create_issue(github, repo, issue, issue_type):
                             total_issues += 1
+                            repos_with_issues.append({
+                                'repo': repo.full_name,
+                                'issue_title': check.issue_title,
+                                'issue_type': issue_type
+                            })
                         
                 except Exception as e:
                     logger.error(f"{repo.name}: Error checking {check_target}: {e}")
                     continue
         
         logger.info(f"Code pattern scan complete. Checks performed: {total_checks}, Matches found: {total_matches}, Issues created: {total_issues}")
+        
+        # Display summary of repositories where issues would be created
+        if repos_with_issues:
+            logger.info(f"\n{'[DRY RUN] ' if self.dry_run else ''}Issues {'would be ' if self.dry_run else ''}created in {len(repos_with_issues)} repositories:")
+            for item in repos_with_issues:
+                logger.info(f"  • {item['repo']}")
+        else:
+            logger.info(f"No issues {'would be ' if self.dry_run else ''}created in any repositories.")
 
     async def _create_issue(self, github: GitHubClient, repo, issue: IssuePayload, issue_type: str = "code pattern") -> bool:
         """Common issue creation logic with error handling.

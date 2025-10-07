@@ -28,7 +28,6 @@ organizations:
     - azure-openai-entity-extraction
     - openai-chat-backend-fastapi
     - azure-postgres-pgvector-python
-    - msdocs-flask-postgresql-sample-app
     - simple-flask-server-appservice
     - rag-postgres-openai-python
     - aisearch-openai-rag-audio
